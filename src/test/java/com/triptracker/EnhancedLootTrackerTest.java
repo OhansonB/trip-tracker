@@ -1,13 +1,13 @@
-package com.example;
+package com.triptracker;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 
-public class ExamplePluginTest
+public class EnhancedLootTrackerTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(ExamplePlugin.class);
+		ExternalPluginManager.loadBuiltin(EnhancedLootTrackerPlugin.class);
 		RuneLite.main(args);
 	}
 }
