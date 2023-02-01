@@ -1,5 +1,6 @@
 package com.triptracker;
 
+import com.google.common.collect.ImmutableMap;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
@@ -10,12 +11,14 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class EnhancedLootTrackerPanel extends PluginPanel {
-    private static final String MAIN_PANEL_TITLE = "Loot tracker";
     private JPanel layoutPanel;
     private JPanel lootBoxPanel;
-
     private static final ImageIcon GROUPED_MODE_ICON;
     private static final ImageIcon GROUPED_MODE_ICON_HOVER;
     private static final ImageIcon GROUPED_MODE_ICON_UNSELECTED;
@@ -29,6 +32,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final JRadioButton groupedModeButton = new JRadioButton();
     private final JRadioButton listModeButton = new JRadioButton();
     private final JRadioButton tripModeButton = new JRadioButton();
+    private final int DEFAULT_TRACKING_MODE = 0;
+    protected int selectedTrackingMode = DEFAULT_TRACKING_MODE;
+    private EnhancedLootTrackerPlugin parentPlugin;
+    private LinkedHashMap<String, JPanel> mapOfNpcsToGroupLootBoxes = new LinkedHashMap<>();
 
 
     static {
@@ -80,27 +87,40 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         listModeButton.setRolloverIcon(LIST_MODE_ICON_HOVER);
         listModeButton.setSelectedIcon(LIST_MODE_ICON);
         listModeButton.setToolTipText("Show each loot drop separately");
-        //listModeButton.addActionListener(e -> changeGrouping(false));
+        listModeButton.addActionListener(e -> changeTrackingMode(0));
 
         SwingUtil.removeButtonDecorations(groupedModeButton);
         groupedModeButton.setIcon(GROUPED_MODE_ICON_UNSELECTED);
         groupedModeButton.setRolloverIcon(GROUPED_MODE_ICON_HOVER);
         groupedModeButton.setSelectedIcon(GROUPED_MODE_ICON);
         groupedModeButton.setToolTipText("Show loot drops grouped by NPC name");
-        //groupedModeButton.addActionListener(e -> changeGrouping(false));
+        groupedModeButton.addActionListener(e -> changeTrackingMode(1));
 
         SwingUtil.removeButtonDecorations(tripModeButton);
         tripModeButton.setIcon(TRIP_MODE_ICON_UNSELECTED);
         tripModeButton.setRolloverIcon(TRIP_MODE_ICON_HOVER);
         tripModeButton.setSelectedIcon(TRIP_MODE_ICON);
         tripModeButton.setToolTipText("Show controls for creating loot trips");
-        //tripModeButton.addActionListener(e -> changeGrouping(false));
+        tripModeButton.addActionListener(e -> changeTrackingMode(2));
 
         ButtonGroup buttonGroup = new ButtonGroup();
         buttonGroup.add(listModeButton);
         buttonGroup.add(groupedModeButton);
         buttonGroup.add(tripModeButton);
-        listModeButton.setSelected(true);
+
+        switch (DEFAULT_TRACKING_MODE) {
+            case 0:
+                listModeButton.setSelected(true);
+                break;
+            case 1:
+                groupedModeButton.setSelected(true);
+                break;
+            case 2:
+                tripModeButton.setSelected(true);
+                break;
+            default:
+                break;
+        }
 
         modeControlsPanel.add(listModeButton);
         modeControlsPanel.add(groupedModeButton);
@@ -117,10 +137,81 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         return lootBoxPanel;
     }
+
+    // This method is used for adding a loot box when in list view mode
     public void addLootBox(TrackableItemDrop itemDrop) {
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop);
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
     }
+
+    // This method is used for adding a loot box when in grouped view mode
+    public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName) {
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
+        JPanel groupedLootBox = newDropBox.buildPanelBox();
+
+        if (mapOfNpcsToGroupLootBoxes.containsKey(npcName)) {
+            lootBoxPanel.remove(mapOfNpcsToGroupLootBoxes.get(npcName));
+            mapOfNpcsToGroupLootBoxes.replace(npcName, groupedLootBox);
+
+
+        } else if (!mapOfNpcsToGroupLootBoxes.containsKey(npcName)) {
+            mapOfNpcsToGroupLootBoxes.put(npcName, groupedLootBox);
+        }
+
+        lootBoxPanel.add(groupedLootBox,0);
+        lootBoxPanel.revalidate();
+        lootBoxPanel.repaint();
+    }
+
+    private void changeTrackingMode(int newTrackingModeType) {
+        if (newTrackingModeType != selectedTrackingMode) {
+            selectedTrackingMode = newTrackingModeType;
+            rebuildLootPanel();
+        }
+    }
+
+    // This method is used to build the loot panels from scratch, using stored data. This method is called for example
+    // when switching between view modes, and eventually when re-building the loot tracker from scratch between
+    // sessions using persisted data.
+    private void rebuildLootPanel() {
+
+        // Remove all components from lootBoxPanel
+        SwingUtil.fastRemoveAll(lootBoxPanel);
+        lootBoxPanel.revalidate();
+        lootBoxPanel.repaint();
+
+        // case 0 = list view; case 1 = grouped by NPC; case 2 = trip mode.
+        switch (selectedTrackingMode) {
+            case 0:
+                ArrayList<TrackableItemDrop> listViewDrops = parentPlugin.getListViewDropArray();
+                for (TrackableItemDrop itemDrop : listViewDrops) {
+                    addLootBox(itemDrop);
+                }
+
+                break;
+            case 1:
+                LinkedHashMap<String, LinkedHashMap<String, Object>> aggregatedDropsByNpc = parentPlugin.getDropQuantitiesByTypeOfNpc();
+                Set<String> keys = aggregatedDropsByNpc.keySet();
+
+                for (String key : keys) {
+                    addLootBox(aggregatedDropsByNpc.get(key), key);
+                }
+
+                break;
+            case 2:
+                System.out.println("Switching to trip view mode");
+                break;
+            default:
+                System.out.println("You have tried to switch to a view mode that is not supported");
+                break;
+        }
+    }
+
+    public void setParentPlugin(EnhancedLootTrackerPlugin parentPlugin) {
+        this.parentPlugin = parentPlugin;
+    }
+
+    public int getSelectedTrackingMode() { return selectedTrackingMode; }
 }

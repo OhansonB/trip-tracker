@@ -21,7 +21,6 @@ import net.runelite.client.game.ItemStack;
 import net.runelite.client.game.ItemManager;
 
 import java.awt.image.BufferedImage;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -56,6 +55,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private final LinkedHashMap<String, ArrayList<TrackableItemDrop>> aggregatedViewDropArray = new LinkedHashMap<>();
 
 	private final LinkedHashMap<String, LinkedHashMap<String, Object>> dropQuantitiesByTypeOfNpc = new LinkedHashMap<>();
+	private String lastNpcKilled;
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -65,6 +65,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Override
 	protected void startUp() throws Exception {
 		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
+		panel.setParentPlugin(this);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/panel_icon.png");
 
@@ -76,13 +77,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				.build();
 
 		clientToolbar.addNavigation(navButton);
-		System.out.println("startUp()");
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
 		clientToolbar.removeNavigation(navButton);
-		System.out.println("shutDown()");
 	}
 
 	@Subscribe
@@ -91,6 +90,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		final Collection<ItemStack> items = npcLootReceived.getItems();
 
 		final String npcName = npc.getName();
+		lastNpcKilled = npcName;
 		final int combat = npc.getCombatLevel();
 
 		TrackableItemDrop newItemDrop = new TrackableItemDrop(npcName, combat);
@@ -119,7 +119,21 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	private void processNewDrop(TrackableItemDrop newItemDrop) {
 		updateItemMaps(newItemDrop);
-		updateUiElements(newItemDrop);
+
+		int trackingMode = panel.getSelectedTrackingMode();
+		switch (trackingMode) {
+			case 0:
+				updateListViewUi(newItemDrop);
+				break;
+			case 1:
+				updateGroupedViewUI();
+				break;
+			case 2:
+				System.out.println("The logic for inserting boxes into trip view mode has not yet been created");
+				break;
+			default:
+				break;
+		}
 
 	}
 
@@ -201,13 +215,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 		}
 
-		System.out.println("Number of drops from " + newItemDrop.getDropNpcName() + " is " + numberOfDrops);
-		System.out.println("Total GE value of drops this NPC is " + totalGeFromThisNpc + "gp\n");
-		System.out.println("Rolling summary of kills for this NPC:\n" + dropQuantitiesByTypeOfNpc.get(newItemDrop.getDropNpcName()) + "\n");
-		System.out.println("Rolling summary of kills for all NPCs:\n" + dropQuantitiesByTypeOfNpc + "\n\n");
-	}
-	private void updateUiElements(TrackableItemDrop newItemDrop) {
-		updateListViewUi(newItemDrop);
+//		System.out.println("Number of drops from " + newItemDrop.getDropNpcName() + " is " + numberOfDrops);
+//		System.out.println("Total GE value of drops this NPC is " + totalGeFromThisNpc + "gp\n");
+//		System.out.println("Rolling summary of kills for this NPC:\n" + dropQuantitiesByTypeOfNpc.get(newItemDrop.getDropNpcName()) + "\n");
+//		System.out.println("Rolling summary of kills for all NPCs:\n" + dropQuantitiesByTypeOfNpc + "\n\n");
 	}
 
 	private void updateListViewUi(TrackableItemDrop newItemDrop) {
@@ -216,5 +227,21 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				panel.addLootBox(newItemDrop);
 			}
 		});
+	}
+
+	private void updateGroupedViewUI() {
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				panel.addLootBox(dropQuantitiesByTypeOfNpc.get(lastNpcKilled), lastNpcKilled);
+			}
+		});
+	}
+
+	public ArrayList<TrackableItemDrop> getListViewDropArray() {
+		return listViewDropArray;
+	}
+
+	public LinkedHashMap<String, LinkedHashMap<String, Object>> getDropQuantitiesByTypeOfNpc() {
+		return dropQuantitiesByTypeOfNpc;
 	}
 }
