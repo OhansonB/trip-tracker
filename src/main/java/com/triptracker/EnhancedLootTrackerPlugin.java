@@ -3,9 +3,13 @@ package com.triptracker;
 import javax.inject.Inject;
 import javax.swing.*;
 
+import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.NPC;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.plugins.Plugin;
@@ -24,26 +28,25 @@ import java.util.LinkedHashMap;
 @Slf4j
 @PluginDescriptor(
 		name = "Trip tracker",
-		description = "Loot tracker with user controllable trip tracking capability",
+		description = "Loot tracker with trip scoping capabilities",
 		tags = {"loot", "tracker", "drops", "drop", "trip"}
 )
 
 public class EnhancedLootTrackerPlugin extends Plugin  {
+	 @Inject
+	 private ChatMessageManager chatMessageManager;
 
-// @Inject
-// private ChatMessageManager chatMessageManager;
-//
-// @Inject
-// private EnhancedLootTrackerConfig config;
-//
-// @Inject
-// private Client client;
+	 @Inject
+	 private EnhancedLootTrackerConfig config;
 
-	@Inject
-	private final ItemManager itemManager;
+	 @Inject
+	 private Client client;
 
 	@Inject
-	private final ClientToolbar clientToolbar;
+	private ItemManager itemManager;
+
+	@Inject
+	private ClientToolbar clientToolbar;
 
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
@@ -55,15 +58,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private LinkedHashMap<String, LinkedHashMap<String, Object>> tripQuantitiesByTypeOfNpc = new LinkedHashMap<>();
 	private String lastNpcKilled;
 
-	public EnhancedLootTrackerPlugin(ItemManager itemManager, ClientToolbar clientToolbar) {
-		this.itemManager = itemManager;
-		this.clientToolbar = clientToolbar;
+	@Provides
+	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
+		return configManager.getConfig(EnhancedLootTrackerConfig.class);
 	}
-
-	//	@Provides
-	// EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
-	// 	return configManager.getConfig(EnhancedLootTrackerConfig.class);
-	// }
 
 	@Override
 	protected void startUp() throws Exception {
