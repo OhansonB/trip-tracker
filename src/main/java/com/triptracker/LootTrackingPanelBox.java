@@ -1,11 +1,8 @@
 package com.triptracker;
 
-import net.runelite.api.ItemComposition;
-import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 
-import javax.inject.Inject;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -23,13 +20,13 @@ public class LootTrackingPanelBox extends JPanel {
     private int numberOfKills;
     private String npcName;
     private long totalGeValue;
+    private long lastKillTime;
 
 
     // This constructor is used when creating a loot box panel containing a single drop (e.g., in list view)
     LootTrackingPanelBox(TrackableItemDrop itemDrop) {
         this.itemDrop = itemDrop;
         this.boxType = 0;
-        buildPanelBox();
     }
 
     // This constructor is used when creating a loot box panel containing multiple drops (e.g., in grouped and trip
@@ -39,10 +36,9 @@ public class LootTrackingPanelBox extends JPanel {
         this.npcName = npcName;
         this.numberOfKills = (int) droppedItemsSummary.get("numberOfDrops");
         this.totalGeValue = (long) droppedItemsSummary.get("totalGeValue");
+        this.lastKillTime = (long) droppedItemsSummary.get("lastKillTime");
 
         this.boxType = 1;
-
-        buildPanelBox();
     }
 
     JPanel buildPanelBox() {
@@ -50,7 +46,7 @@ public class LootTrackingPanelBox extends JPanel {
         final JLabel dropValueLabel = new JLabel();
         final JLabel dropTimeDateLabel = new JLabel();
 
-        // This panel contains the grid that shows item drop detail (item sprite and quantity)
+        // This panel contains the grid that shows item drop detail
         final JPanel droppedItemsPanel = new JPanel();
         droppedItemsPanel.setBackground(ColorScheme.DARK_GRAY_HOVER_COLOR);
 
@@ -68,48 +64,47 @@ public class LootTrackingPanelBox extends JPanel {
                     droppedItemNameLabel.setText(item.getItemName() + " x" + item.getQuantity());
                     droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
-                    droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 0, 5));
+                    droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
                     droppedItemsPanel.add(droppedItemNameLabel, BorderLayout.WEST);
 
                     JLabel droppedItemValueLabel = new JLabel();
                     droppedItemValueLabel.setText(item.getTotalGePrice() + "gp");
                     droppedItemValueLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemValueLabel.setForeground(Color.LIGHT_GRAY);
-                    droppedItemValueLabel.setBorder(new EmptyBorder(2, 5, 0, 5));
+                    droppedItemValueLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
                     droppedItemValueLabel.setHorizontalAlignment(JLabel.RIGHT);
                     droppedItemsPanel.add(droppedItemValueLabel);
                 }
                 break;
             case 1:
                 droppedItemsPanel.setLayout(new GridLayout(0, 1, 2, 2));
-                System.out.println("case 1");
                 System.out.println(droppedItemsSummary);
 
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
                 dropValueLabel.setText(totalGeValue + "gp");
 
-                Date date = new Date(System.currentTimeMillis());
+                Date date = new Date(lastKillTime);
                 Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d YYYY");
                 dropTimeDateLabel.setText("Last kill at: " + format.format(date));
 
                 Set<String> mapKeys = droppedItemsSummary.keySet();
 
                 for (String key : mapKeys) {
-                    if (key != "totalGeValue" && key != "numberOfDrops") {
+                    if (key != "totalGeValue" && key != "numberOfDrops" && key != "lastKillTime") {
                         JLabel droppedItemNameLabel = new JLabel();
                         droppedItemNameLabel.setText(key + " x" + droppedItemsSummary.get(key));
                         droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                         droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
-                        droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 0, 5));
+                        droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
                         droppedItemsPanel.add(droppedItemNameLabel, BorderLayout.WEST);
                     }
                 }
                 break;
-            case 2:
-                break;
             default:
                 break;
         }
+
+
         // Contains all the other panels that constitute the loot box
         final JPanel outerPanel = new JPanel();
         outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);

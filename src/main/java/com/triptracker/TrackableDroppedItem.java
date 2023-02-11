@@ -37,4 +37,6 @@ public class TrackableDroppedItem {
     String getItemName() { return itemName; }
 
     int getQuantity() { return quantity; }
+
+    int getItemId() { return itemId; }
 }
