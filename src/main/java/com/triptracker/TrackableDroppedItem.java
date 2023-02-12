@@ -1,11 +1,8 @@
 package com.triptracker;
 
-import java.text.Format;
 import java.text.MessageFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
-public class TrackableDroppedItem {
+public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
 
     private final int itemId;
     private final String itemName;
@@ -39,4 +36,9 @@ public class TrackableDroppedItem {
     int getQuantity() { return quantity; }
 
     int getItemId() { return itemId; }
+
+    @Override
+    public int compareTo(TrackableDroppedItem otherItem) {
+        return Long.compare(otherItem.getTotalGePrice(), this.getTotalGePrice());
+    }
 }

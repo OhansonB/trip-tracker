@@ -8,10 +8,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.text.Format;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Set;
+import java.util.*;
 
 public class LootTrackingPanelBox extends JPanel {
     private TrackableItemDrop itemDrop;
@@ -58,6 +55,7 @@ public class LootTrackingPanelBox extends JPanel {
                 dropTimeDateLabel.setText(itemDrop.getDateFromLong(itemDrop.getDropTimeDate()));
 
                 ArrayList<TrackableDroppedItem> droppedItems = itemDrop.getDroppedItems();
+                Collections.sort(droppedItems);
 
                 for (final TrackableDroppedItem item: droppedItems) {
                     JLabel droppedItemNameLabel = new JLabel();
