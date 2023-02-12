@@ -33,10 +33,13 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private static final ImageIcon TRIP_MODE_ICON_UNSELECTED;
     private static final ImageIcon ADD_TRIP_TRACKER_ICON;
     private static final ImageIcon ADD_TRIP_TRACKER_ICON_HOVER;
+    private static final ImageIcon STOP_TRIP_TRACKER_ICON;
+    private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
     private final JRadioButton groupedModeButton = new JRadioButton();
     private final JRadioButton listModeButton = new JRadioButton();
     private final JRadioButton tripModeButton = new JRadioButton();
     private final JButton addTripButton = new JButton();
+    private final JButton stopTripButton = new JButton();
     private LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
     private LinkedHashMap<String, LinkedHashMap<String, Object>> tripsMap = new LinkedHashMap<>();
     private LinkedHashMap<String, Object> tripLootSummaries;
@@ -64,6 +67,12 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         ADD_TRIP_TRACKER_ICON = new ImageIcon(addTripTrackerIcon);
         ADD_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(addTripTrackerIcon, -180));
+
+        // Trip control icons
+        final BufferedImage stopIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/stop_trip_icon.png");
+
+        STOP_TRIP_TRACKER_ICON = new ImageIcon(stopIcon);
+        STOP_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(stopIcon, -180));
     }
 
     EnhancedLootTrackerPanel() {
@@ -344,6 +353,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerSummaryPanel.setLayout(new BorderLayout());
         innerSummaryPanel.setBorder(new EmptyBorder(7, 10, 7, 7));
+        innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
+        //innerSummaryPanel.setBorder(new EmptyBorder(5, 25, 5, 5));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
         // This label summaries the npc name and level
@@ -355,6 +366,19 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         activeTripLootPanel = new JPanel();
         activeTripLootPanel.setLayout(new BoxLayout(activeTripLootPanel, BoxLayout.Y_AXIS));
         outerPanel.add(activeTripLootPanel);
+
+        SwingUtil.removeButtonDecorations(stopTripButton);
+        stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
+        stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
+        stopTripButton.setToolTipText("Click to end the trip");
+        stopTripButton.setBorder(null);
+
+        if (stopTripButton.getActionListeners().length == 0) {
+            stopTripButton.addActionListener(e -> stopTrip());
+        }
+
+        innerSummaryPanel.add(stopTripButton, BorderLayout.EAST);
+        stopTripButton.setVisible(true);
 
         lootBoxPanel.add(outerPanel,1);
         lootBoxPanel.revalidate();
@@ -375,6 +399,24 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             tripsMap.replace(tripToUpdate, tripLootSummaries);
         } else {
             tripsMap.put(tripToUpdate, tripLootSummaries);
+        }
+    }
+    public void stopTrip() {
+        if (tripActive) {
+            int selectedOption = JOptionPane.showConfirmDialog(null,
+                    "If you end this trip you will not be able to restart it. Are you sure?",
+                    "Warning!",
+                    JOptionPane.YES_NO_OPTION);
+
+            switch (selectedOption) {
+                case JOptionPane.YES_OPTION:
+                    tripActive = false;
+                    activeTripName = null;
+                    stopTripButton.setVisible(false);
+                    break;
+                case JOptionPane.NO_OPTION:
+                    break;
+            }
         }
     }
 }
