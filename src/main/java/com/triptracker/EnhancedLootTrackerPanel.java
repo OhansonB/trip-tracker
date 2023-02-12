@@ -265,20 +265,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             JPanel newLootPanel = newDropBox.buildPanelBox();
 
             if (!rebuilding) {
-                if (tripLootSummaries.containsKey(npcName)) {
-                    tripLootSummaries.replace(npcName, npcDropsSummary);
-                } else {
-                    tripLootSummaries.put(npcName, npcDropsSummary);
-                }
-
-                if (tripsMap.get(tripToUpdate).containsKey(npcName)) {
-                    if (activeTripLootPanels.containsKey(npcName)) {
-                        activeTripLootPanel.remove(activeTripLootPanels.get(npcName));
-                    }
-                    tripsMap.replace(tripToUpdate, tripLootSummaries);
-                } else {
-                    tripsMap.put(tripToUpdate, tripLootSummaries);
-                }
+                updateTripMaps(npcDropsSummary, npcName, tripToUpdate);
             }
 
             activeTripLootPanels.put(npcName, newLootPanel);
@@ -372,5 +359,22 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.add(outerPanel,1);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
+    }
+
+    public void updateTripMaps(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate) {
+        if (tripLootSummaries.containsKey(npcName)) {
+            tripLootSummaries.replace(npcName, npcDropsSummary);
+        } else {
+            tripLootSummaries.put(npcName, npcDropsSummary);
+        }
+
+        if (tripsMap.get(tripToUpdate).containsKey(npcName)) {
+            if (activeTripLootPanels.containsKey(npcName)) {
+                activeTripLootPanel.remove(activeTripLootPanels.get(npcName));
+            }
+            tripsMap.replace(tripToUpdate, tripLootSummaries);
+        } else {
+            tripsMap.put(tripToUpdate, tripLootSummaries);
+        }
     }
 }
