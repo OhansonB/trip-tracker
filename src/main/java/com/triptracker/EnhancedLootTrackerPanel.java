@@ -43,7 +43,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private LinkedHashMap<String, Trip> tripsMap = new LinkedHashMap<>();
     private JPanel activeTripLootPanel;
     private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
-    private LinkedHashMap<String, LinkedHashMap<String, LootTrackingPanelBox>> tripPanels = new LinkedHashMap<>();
+    private LinkedHashMap<String, LinkedHashMap<String, LootTrackingPanelBox>> tripPanelBoxes = new LinkedHashMap<>();
 
     static {
         // Tracker mode control icons
@@ -201,18 +201,18 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             lootBoxPanel.add(buildTripTrackerControls());
 
             // tripPanels is a map of trip names to trip panels associated with that trip
-            tripPanels.forEach((aKey, aValue) -> {
+            tripPanelBoxes.forEach((aKey, aValue) -> {
                 System.out.println(aKey);
 
                 // Build a trip header with the panel name
                 buildTripHeaderPanel(aKey);
 
                 // Get the trip panels map associated with the given trip and iterate over them
-                tripPanels.get(aKey).forEach((bKey, bValue) -> {
+                tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
                     System.out.println(bKey);
                     System.out.println(bValue);
 
-                    LootTrackingPanelBox panelBox = tripPanels.get(aKey).get(bKey);
+                    LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
                     JPanel panel = panelBox.buildPanelBox();
                     panel.setName(bKey);
 
@@ -253,20 +253,24 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                     }
                 }
 
-                activeTripLootPanels.replace(npcName, newDropBox);
+                activeTripLootPanels.remove(npcName);
+                activeTripLootPanels.put(npcName, newDropBox);
             } else {
                 activeTripLootPanels.put(npcName, newDropBox);
             }
 
-            if (tripPanels.containsKey(activeTripName)) {
-                tripPanels.replace(activeTripName, activeTripLootPanels);
+            if (tripPanelBoxes.containsKey(activeTripName)) {
+                tripPanelBoxes.remove(activeTripName);
+                tripPanelBoxes.put(activeTripName, activeTripLootPanels);
             } else {
-                tripPanels.put(activeTripName, activeTripLootPanels);
+                tripPanelBoxes.put(activeTripName, activeTripLootPanels);
             }
 
-            activeTripLootPanel.add(newLootPanel, 0);
-            activeTripLootPanel.revalidate();
-            activeTripLootPanel.repaint();
+            if (selectedTrackingMode == 2) {
+                activeTripLootPanel.add(newLootPanel, 0);
+                activeTripLootPanel.revalidate();
+                activeTripLootPanel.repaint();
+            }
         }
     }
 
@@ -281,15 +285,18 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         if (groupedLootBoxPanels.containsKey(npcName)) {
             lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
-            groupedLootBoxPanels.replace(npcName, newLootPanel);
+            groupedLootBoxPanels.remove(npcName);
+            groupedLootBoxPanels.put(npcName, newLootPanel);
 
         } else {
             groupedLootBoxPanels.put(npcName, newLootPanel);
         }
 
-        lootBoxPanel.add(newLootPanel,0);
-        lootBoxPanel.revalidate();
-        lootBoxPanel.repaint();
+        if (selectedTrackingMode == 1) {
+            lootBoxPanel.add(newLootPanel, 0);
+            lootBoxPanel.revalidate();
+            lootBoxPanel.repaint();
+        }
     }
 
     private void changeTrackingMode(int newTrackingModeType) {
@@ -321,7 +328,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             toggleTripStatus(tripName);
             buildTripHeaderPanel(tripName);
             activeTripLootPanels = new LinkedHashMap<>();
-            tripPanels.put(tripName, activeTripLootPanels);
+            tripPanelBoxes.put(tripName, activeTripLootPanels);
             tripsMap.put(tripName, parentPlugin.getActiveTrip());
 
         } else {

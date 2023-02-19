@@ -116,16 +116,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		switch (trackingMode) {
 			case 0:
 				updateListViewUi(newItemDrop);
+				updateGroupedViewUI();
+				updateCurrentTripUi();
 				break;
 
 			case 1:
-				updateGroupedViewUI();
-				break;
-
 			case 2:
-				if (panel.getActiveTripName() != null) {
-					updateCurrentTripUi();
-				}
+				updateGroupedViewUI();
+				updateCurrentTripUi();
 				break;
 
 			default:
@@ -140,26 +138,28 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	private void updateCurrentTripUi() {
-		Trip aTrip = getActiveTrip();
-		ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
+		if (panel.getActiveTripName() != null) {
+			Trip aTrip = getActiveTrip();
+			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
 
-		ArrayList<LootAggregation> tempLootAggregation = null;
-		NpcLootAggregate tempNpcLootAggregate = null;
+			ArrayList<LootAggregation> tempLootAggregation = null;
+			NpcLootAggregate tempNpcLootAggregate = null;
 
-		for (NpcLootAggregate a: tripNpcAggregates) {
-			if (a.getNpcName().equals(lastNpcKilled)) {
-				tempNpcLootAggregate = a;
-				tempLootAggregation = a.aggregateNpcDrops();
-				break;
+			for (NpcLootAggregate a: tripNpcAggregates) {
+				if (a.getNpcName().equals(lastNpcKilled)) {
+					tempNpcLootAggregate = a;
+					tempLootAggregation = a.aggregateNpcDrops();
+					break;
+				}
 			}
+
+			NpcLootAggregate npcLootAggregate = tempNpcLootAggregate;
+			ArrayList<LootAggregation> lootAggregation = tempLootAggregation;
+
+			SwingUtilities.invokeLater(() ->
+					panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripName())
+			);
 		}
-
-		NpcLootAggregate npcLootAggregate = tempNpcLootAggregate;
-		ArrayList<LootAggregation> lootAggregation = tempLootAggregation;
-
-		SwingUtilities.invokeLater(() ->
-				panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripName())
-		);
 	}
 
 	public ArrayList<TrackableItemDrop> getListViewDropArray() {
@@ -168,6 +168,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (panel.getActiveTripName() != null) {
+			System.out.println("Adding itemDrop to active trip");
 			Trip trip = getActiveTrip();
 
 			String npcName = itemDrop.getDropNpcName();
@@ -236,8 +237,19 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			tempAggregate.addDropToNpcAggregate(itemDrop);
 			npcLootAggregates.add(tempAggregate);
 		} else {
-			// Otherwise update the existing record with the new drop
+			// Add a drop to an existing record
 			npcLootAggregates.get(i).addDropToNpcAggregate(itemDrop);
+
+			// Create a copy of that record
+			NpcLootAggregate tempTempAggregate = npcLootAggregates.get(i);
+
+			// Remove the record from the ArrayList
+			npcLootAggregates.remove(i);
+
+			// Add the copy back to the ArrayList
+			// This is required to float the record to the top of the list so that when grouped view rebuilds it
+			// does so no the correct order
+			npcLootAggregates.add(tempTempAggregate);
 		}
 
 		getItemAggregations(npcName);
@@ -317,7 +329,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		listViewDropArray.add(newItemDrop);
 		addDropToGroupedAggregates(newItemDrop);
 		addDropToTripAggregates(newItemDrop);
-//		updateDropSummaryMaps(currentTripItemSummariesByNpC, newItemDrop);
 	}
 
 	private void updateListViewUi(TrackableItemDrop newItemDrop) {
