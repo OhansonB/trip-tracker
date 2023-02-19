@@ -321,6 +321,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             toggleTripStatus(tripName);
             buildTripHeaderPanel(tripName);
             activeTripLootPanels = new LinkedHashMap<>();
+            tripPanels.put(tripName, activeTripLootPanels);
             tripsMap.put(tripName, parentPlugin.getActiveTrip());
 
         } else {
