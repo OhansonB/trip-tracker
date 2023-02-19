@@ -1,6 +1,7 @@
 package com.triptracker;
 
 import java.text.MessageFormat;
+import java.util.ArrayList;
 
 public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
 
@@ -40,5 +41,14 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
     @Override
     public int compareTo(TrackableDroppedItem otherItem) {
         return Long.compare(otherItem.getTotalGePrice(), this.getTotalGePrice());
+    }
+
+    public boolean containedIn(ArrayList<LootAggregation> aggregatedItemList) {
+        boolean recordFound = false;
+        for (LootAggregation aggregation : aggregatedItemList) {
+            if (aggregation.getItemId() == this.getItemId())
+                recordFound = true;
+        }
+        return recordFound;
     }
 }

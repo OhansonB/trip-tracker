@@ -12,7 +12,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Set;
 
 public class EnhancedLootTrackerPanel extends PluginPanel {
     private EnhancedLootTrackerPlugin parentPlugin;
@@ -41,10 +40,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final JButton addTripButton = new JButton();
     private final JButton stopTripButton = new JButton();
     private LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
-    private LinkedHashMap<String, LinkedHashMap<String, Object>> tripsMap = new LinkedHashMap<>();
+    private LinkedHashMap<String, Trip> tripsMap = new LinkedHashMap<>();
     private LinkedHashMap<String, Object> tripLootSummaries;
     private JPanel activeTripLootPanel;
-    private LinkedHashMap<String, JPanel> activeTripLootPanels;
+    private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
+    private LinkedHashMap<String, LinkedHashMap<String, LootTrackingPanelBox>> tripPanels = new LinkedHashMap<>();
 
     static {
         // Tracker mode control icons
@@ -198,46 +198,33 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
 
-        // case 0 = list view; case 1 = grouped by NPC; case 2 = trip mode.
-        switch (selectedTrackingMode) {
-            case 0:
-                ArrayList<TrackableItemDrop> listViewDrops = parentPlugin.getListViewDropArray();
-                for (TrackableItemDrop itemDrop : listViewDrops) {
-                    addLootBox(itemDrop);
-                }
+        if (selectedTrackingMode == 2) {
+            lootBoxPanel.add(buildTripTrackerControls());
 
-                break;
-            case 1:
-                LinkedHashMap<String, LinkedHashMap<String, Object>> aggregatedDropsByNpc = parentPlugin.getDropQuantitiesByTypeOfNpc();
-                Set<String> keys = aggregatedDropsByNpc.keySet();
+            // tripPanels is a map of trip names to trip panels associated with that trip
+            tripPanels.forEach((aKey, aValue) -> {
+                System.out.println(aKey);
 
-                for (String key : keys) {
-                    addLootBox(aggregatedDropsByNpc.get(key), key);
-                }
+                // Build a trip header with the panel name
+                buildTripHeaderPanel(aKey);
 
-                break;
-            case 2:
-                lootBoxPanel.add(buildTripTrackerControls());
+                // Get the trip panels map associated with the given trip and iterate over them
+                tripPanels.get(aKey).forEach((bKey, bValue) -> {
+                    System.out.println(bKey);
+                    System.out.println(bValue);
 
-                Set<String> tripsMapKeys = tripsMap.keySet();
-                for (String a_key : tripsMapKeys) {
-                    buildTripHeaderPanel(a_key);
+                    LootTrackingPanelBox panelBox = tripPanels.get(aKey).get(bKey);
+                    JPanel panel = panelBox.buildPanelBox();
+                    panel.setName(bKey);
 
-                    Set<String> npcsKilledInTrip = tripsMap.get(a_key).keySet();
+                    activeTripLootPanel.add(panel, 0);
+                    activeTripLootPanel.revalidate();
+                    activeTripLootPanel.repaint();
 
-                    for (String b_key : npcsKilledInTrip) {
-                        LinkedHashMap<String, Object> dropSummary = (LinkedHashMap<String, Object>) tripsMap.get(a_key).get(b_key);
-                        String npcName = b_key;
-                        String tripToUpdate = a_key;
-
-                        addLootBox(dropSummary, npcName, tripToUpdate, true);
-                    }
-                }
-
-                break;
-            default:
-                System.out.println("You have tried to switch to a view mode that is not supported");
-                break;
+                });
+            });
+        } else {
+            parentPlugin.rebuildLootPanel();
         }
     }
 
@@ -249,7 +236,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.repaint();
     }
 
-    // This method is used for adding a loot box when in grouped view mode
+    // This method is used for adding a loot box when in grouped view mode (old implementation)
     public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName) {
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
         JPanel groupedLootBox = newDropBox.buildPanelBox();
@@ -267,21 +254,79 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.repaint();
     }
 
-    // This method is used for adding a loot box when an active trip is active
-    public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate, Boolean rebuilding) {
-        if (tripActive) {
-            LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
-            JPanel newLootPanel = newDropBox.buildPanelBox();
+    // This method is used for adding a loot box when an active trip is active (old implementation)
+//    public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate, Boolean rebuilding) {
+//        if (tripActive) {
+//            LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
+//            JPanel newLootPanel = newDropBox.buildPanelBox();
+//
+//            if (!rebuilding) {
+//                updateTripMaps(npcDropsSummary, npcName, tripToUpdate);
+//            }
+//
+//            activeTripLootPanels.put(npcName, newLootPanel);
+//            activeTripLootPanel.add(newLootPanel, 0);
+//            activeTripLootPanel.revalidate();
+//            activeTripLootPanel.repaint();
+//        }
+//    }
 
-            if (!rebuilding) {
-                updateTripMaps(npcDropsSummary, npcName, tripToUpdate);
+
+    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String activeTripName) {
+        if (tripActive) {
+            String npcName = npcLootAggregate.getNpcName();
+            int numberOfKills = npcLootAggregate.getNumberOfKills();
+            String lastKillTime = npcLootAggregate.getLastKillTime();
+
+            LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
+            JPanel newLootPanel = newDropBox.buildPanelBox();
+            newLootPanel.setName(npcName);
+
+            if (activeTripLootPanels.containsKey(npcName)) {
+                Component[] componentList = activeTripLootPanel.getComponents();
+                for(Component c : componentList){
+                    if(c.getName().equals(npcName)){
+                        activeTripLootPanel.remove(c);
+                    }
+                }
+
+                activeTripLootPanels.replace(npcName, newDropBox);
+            } else {
+                activeTripLootPanels.put(npcName, newDropBox);
             }
 
-            activeTripLootPanels.put(npcName, newLootPanel);
+            if (tripPanels.containsKey(activeTripName)) {
+                tripPanels.replace(activeTripName, activeTripLootPanels);
+            } else {
+                tripPanels.put(activeTripName, activeTripLootPanels);
+            }
+
             activeTripLootPanel.add(newLootPanel, 0);
             activeTripLootPanel.revalidate();
             activeTripLootPanel.repaint();
         }
+    }
+
+    // This method is used for adding a loot box when in grouped view mode (new implementation)
+    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation) {
+        String npcName = npcLootAggregate.getNpcName();
+        int numberOfKills = npcLootAggregate.getNumberOfKills();
+        String lastKillTime = npcLootAggregate.getLastKillTime();
+
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
+        JPanel newLootPanel = newDropBox.buildPanelBox();
+
+        if (groupedLootBoxPanels.containsKey(npcName)) {
+            lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
+            groupedLootBoxPanels.replace(npcName, newLootPanel);
+
+        } else if (!groupedLootBoxPanels.containsKey(npcName)) {
+            groupedLootBoxPanels.put(npcName, newLootPanel);
+        }
+
+        lootBoxPanel.add(newLootPanel,0);
+        lootBoxPanel.revalidate();
+        lootBoxPanel.repaint();
     }
 
     private void changeTrackingMode(int newTrackingModeType) {
@@ -298,19 +343,22 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     public int getSelectedTrackingMode() { return selectedTrackingMode; }
 
     private void createNewTrip() {
-        tripLootSummaries = new LinkedHashMap<>();
+        String tripName;
 
         if (!tripActive) {
-            int tripNumber = tripsMap.size() + 1;
-            String tripName = "TRIP " + tripNumber;
+            if (parentPlugin.getNumberOfTrips() != 0) {
+                int tripNumber = parentPlugin.getNumberOfTrips();
+                tripName = "TRIP " + tripNumber;
+                parentPlugin.initTrip(tripName);
+            } else {
+                tripName = "TRIP 1";
+                parentPlugin.initTrip(tripName);
+            }
 
             toggleTripStatus(tripName);
             buildTripHeaderPanel(tripName);
-
             activeTripLootPanels = new LinkedHashMap<>();
-            tripsMap.put(tripName, tripLootSummaries);
-
-            parentPlugin.clearTripMap();
+            tripsMap.put(tripName, parentPlugin.getActiveTrip());
 
         } else {
             int selectedOption = JOptionPane.showConfirmDialog(null,
@@ -321,7 +369,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             switch (selectedOption) {
                 case JOptionPane.YES_OPTION:
                     toggleTripStatus(activeTripName);
-                    activeTripLootPanels.clear();
                     createNewTrip();
 
                     break;
@@ -378,29 +425,33 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         }
 
         innerSummaryPanel.add(stopTripButton, BorderLayout.EAST);
-        stopTripButton.setVisible(true);
+
+        if (tripActive) {
+            stopTripButton.setVisible(true);
+        }
 
         lootBoxPanel.add(outerPanel,1);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
     }
 
-    public void updateTripMaps(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate) {
-        if (tripLootSummaries.containsKey(npcName)) {
-            tripLootSummaries.replace(npcName, npcDropsSummary);
-        } else {
-            tripLootSummaries.put(npcName, npcDropsSummary);
-        }
+//    public void updateTripMaps(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate) {
+//        if (tripLootSummaries.containsKey(npcName)) {
+//            tripLootSummaries.replace(npcName, npcDropsSummary);
+//        } else {
+//            tripLootSummaries.put(npcName, npcDropsSummary);
+//        }
+//
+//        if (tripsMap.get(tripToUpdate).containsKey(npcName)) {
+//            if (activeTripLootPanels.containsKey(npcName)) {
+//                activeTripLootPanel.remove(activeTripLootPanels.get(npcName));
+//            }
+//            tripsMap.replace(tripToUpdate, tripLootSummaries);
+//        } else {
+//            tripsMap.put(tripToUpdate, tripLootSummaries);
+//        }
+//    }
 
-        if (tripsMap.get(tripToUpdate).containsKey(npcName)) {
-            if (activeTripLootPanels.containsKey(npcName)) {
-                activeTripLootPanel.remove(activeTripLootPanels.get(npcName));
-            }
-            tripsMap.replace(tripToUpdate, tripLootSummaries);
-        } else {
-            tripsMap.put(tripToUpdate, tripLootSummaries);
-        }
-    }
     public void stopTrip() {
         if (tripActive) {
             int selectedOption = JOptionPane.showConfirmDialog(null,
