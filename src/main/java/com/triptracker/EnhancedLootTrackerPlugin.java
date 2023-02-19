@@ -23,7 +23,6 @@ import net.runelite.client.game.ItemManager;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 
 @Slf4j
 @PluginDescriptor(
@@ -46,13 +45,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
 	private final ArrayList<TrackableItemDrop> listViewDropArray = new ArrayList<>();
-	private final LinkedHashMap<String, ArrayList<TrackableItemDrop>> aggregatedViewDropArray = new LinkedHashMap<>();
-	private final LinkedHashMap<String, LinkedHashMap<String, Object>> dropQuantitiesByTypeOfNpc = new LinkedHashMap<>();
-	private LinkedHashMap<String, LinkedHashMap<String, Object>> currentTripItemSummariesByNpC = new LinkedHashMap<>();
 	private String lastNpcKilled;
-	private ArrayList<NpcLootAggregate> npcLootAggregates = new ArrayList<>();
-	private LinkedHashMap<String, ArrayList<NpcLootAggregate>> npcAggregateMap = new LinkedHashMap<>();
-	private ArrayList<Trip> trips = new ArrayList<>();
+	private final ArrayList<NpcLootAggregate> npcLootAggregates = new ArrayList<>();
+	private final ArrayList<Trip> trips = new ArrayList<>();
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -144,13 +139,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		SwingUtilities.invokeLater(() -> panel.addLootBox(getNpcAggregate(lastNpcKilled), lootAggregation));
 	}
 
-
-/*	private void updateCurrentTripUi() {
-		SwingUtilities.invokeLater(() ->
-				panel.addLootBox(currentTripItemSummariesByNpC.get(lastNpcKilled), lastNpcKilled, panel.getActiveTripName(), false)
-		);
-	}*/
-
 	private void updateCurrentTripUi() {
 		Trip aTrip = getActiveTrip();
 		ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
@@ -177,74 +165,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public ArrayList<TrackableItemDrop> getListViewDropArray() {
 		return listViewDropArray;
 	}
-
-	public LinkedHashMap<String, LinkedHashMap<String, Object>> getDropQuantitiesByTypeOfNpc() {
-		return dropQuantitiesByTypeOfNpc;
-	}
-
-	public void clearTripMap() {
-		currentTripItemSummariesByNpC = new LinkedHashMap<>();
-	}
-
-//	public void updateDropSummaryMaps(LinkedHashMap<String, LinkedHashMap<String, Object>> mapToUpdate, TrackableItemDrop newItemDrop) {
-//		String npcName = newItemDrop.getDropNpcName();
-//		ArrayList<TrackableItemDrop> listOfDrops;
-//		if (!aggregatedViewDropArray.containsKey(npcName)) {
-//			listOfDrops = new ArrayList<>();
-//			listOfDrops.add(newItemDrop);
-//			aggregatedViewDropArray.put(npcName, listOfDrops);
-//		} else {
-//			listOfDrops = aggregatedViewDropArray.get(npcName);
-//			listOfDrops.add(newItemDrop);
-//			aggregatedViewDropArray.replace(npcName, listOfDrops);
-//		}
-//
-//		// ArrayList of items just dropped by the NPC
-//		ArrayList<TrackableDroppedItem> justDroppedItems = newItemDrop.getDroppedItems();
-//
-//		/*
-//		Check if the outer map contains a record for the NPC from which the items just dropped and if not then create a
-//		new inner map and add zeroed records for totalGeValue and numberOfDrops, and add that map to the outer map.
-//		*/
-//		if (!mapToUpdate.containsKey(newItemDrop.getDropNpcName())) {
-//			// If the map does not contain that type of Npc, create one
-//			LinkedHashMap<String, Object> newMap = new LinkedHashMap<>();
-//			newMap.put("totalGeValue", (long) 0);
-//			newMap.put("numberOfDrops", 0);
-//			newMap.put("lastKillTime", System.currentTimeMillis());
-//			mapToUpdate.put(npcName, newMap);
-//		}
-//
-//		// From the outer map, get the inner map associated with NPC that just dropped items
-//		LinkedHashMap<String, Object> oldNpcMap = mapToUpdate.get(npcName);
-//
-//		// Calculate the incrementation of the total GE value of all kills for this NPC
-//		long totalGeFromThisNpc = newItemDrop.getTotalDropGeValue() + (long) oldNpcMap.get("totalGeValue");
-//		// Calculate the incrementation of the total number of kills of this NPC
-//		int newNumberOfKills = (int) oldNpcMap.get("numberOfDrops") + 1;
-//
-//		// Update inner map with new values for total GE value and number of kills
-//		mapToUpdate.get(npcName).replace("totalGeValue", totalGeFromThisNpc);
-//		mapToUpdate.get(npcName).replace("numberOfDrops", newNumberOfKills);
-//		mapToUpdate.get(npcName).replace("lastKillTime", System.currentTimeMillis());
-//
-//		// Loop through the items just dropped and update the inner map with new item quantities
-//		for (int i = 0; i < justDroppedItems.size(); i++) {
-//			TrackableDroppedItem justDroppedItem = justDroppedItems.get(i);
-//
-//			if (!oldNpcMap.containsKey(justDroppedItem.getItemName())) {
-//				mapToUpdate.get(npcName).put(justDroppedItem.getItemName(), justDroppedItem.getQuantity());
-//			} else {
-//				int oldQuantity = (int) mapToUpdate.get(npcName).get(justDroppedItem.getItemName());
-//				int newQuantity = justDroppedItem.getQuantity() + oldQuantity;
-//				mapToUpdate.get(npcName).replace(justDroppedItem.getItemName(), newQuantity);
-//			}
-//		}
-//
-//		if (panel.getActiveTripName() != null && mapToUpdate == currentTripItemSummariesByNpC) {
-//			panel.updateTripMaps(mapToUpdate.get(npcName), npcName, panel.getActiveTripName());
-//		}
-//	}
 
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (panel.getActiveTripName() != null) {

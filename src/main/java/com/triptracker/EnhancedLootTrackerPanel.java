@@ -39,9 +39,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final JRadioButton tripModeButton = new JRadioButton();
     private final JButton addTripButton = new JButton();
     private final JButton stopTripButton = new JButton();
-    private LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
+    private final LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
     private LinkedHashMap<String, Trip> tripsMap = new LinkedHashMap<>();
-    private LinkedHashMap<String, Object> tripLootSummaries;
     private JPanel activeTripLootPanel;
     private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
     private LinkedHashMap<String, LinkedHashMap<String, LootTrackingPanelBox>> tripPanels = new LinkedHashMap<>();
@@ -236,42 +235,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.repaint();
     }
 
-    // This method is used for adding a loot box when in grouped view mode (old implementation)
-    public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName) {
-        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
-        JPanel groupedLootBox = newDropBox.buildPanelBox();
-
-        if (groupedLootBoxPanels.containsKey(npcName)) {
-            lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
-            groupedLootBoxPanels.replace(npcName, groupedLootBox);
-
-        } else if (!groupedLootBoxPanels.containsKey(npcName)) {
-            groupedLootBoxPanels.put(npcName, groupedLootBox);
-        }
-
-        lootBoxPanel.add(groupedLootBox,0);
-        lootBoxPanel.revalidate();
-        lootBoxPanel.repaint();
-    }
-
-    // This method is used for adding a loot box when an active trip is active (old implementation)
-//    public void addLootBox(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate, Boolean rebuilding) {
-//        if (tripActive) {
-//            LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(npcDropsSummary, npcName);
-//            JPanel newLootPanel = newDropBox.buildPanelBox();
-//
-//            if (!rebuilding) {
-//                updateTripMaps(npcDropsSummary, npcName, tripToUpdate);
-//            }
-//
-//            activeTripLootPanels.put(npcName, newLootPanel);
-//            activeTripLootPanel.add(newLootPanel, 0);
-//            activeTripLootPanel.revalidate();
-//            activeTripLootPanel.repaint();
-//        }
-//    }
-
-
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String activeTripName) {
         if (tripActive) {
             String npcName = npcLootAggregate.getNpcName();
@@ -307,7 +270,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         }
     }
 
-    // This method is used for adding a loot box when in grouped view mode (new implementation)
+    // This method is used for adding a loot box when in grouped view mode
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation) {
         String npcName = npcLootAggregate.getNpcName();
         int numberOfKills = npcLootAggregate.getNumberOfKills();
@@ -320,7 +283,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
             groupedLootBoxPanels.replace(npcName, newLootPanel);
 
-        } else if (!groupedLootBoxPanels.containsKey(npcName)) {
+        } else {
             groupedLootBoxPanels.put(npcName, newLootPanel);
         }
 
@@ -401,7 +364,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         innerSummaryPanel.setLayout(new BorderLayout());
         innerSummaryPanel.setBorder(new EmptyBorder(7, 10, 7, 7));
         innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
-        //innerSummaryPanel.setBorder(new EmptyBorder(5, 25, 5, 5));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
         // This label summaries the npc name and level
@@ -434,23 +396,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
     }
-
-//    public void updateTripMaps(LinkedHashMap<String, Object> npcDropsSummary, String npcName, String tripToUpdate) {
-//        if (tripLootSummaries.containsKey(npcName)) {
-//            tripLootSummaries.replace(npcName, npcDropsSummary);
-//        } else {
-//            tripLootSummaries.put(npcName, npcDropsSummary);
-//        }
-//
-//        if (tripsMap.get(tripToUpdate).containsKey(npcName)) {
-//            if (activeTripLootPanels.containsKey(npcName)) {
-//                activeTripLootPanel.remove(activeTripLootPanels.get(npcName));
-//            }
-//            tripsMap.replace(tripToUpdate, tripLootSummaries);
-//        } else {
-//            tripsMap.put(tripToUpdate, tripLootSummaries);
-//        }
-//    }
 
     public void stopTrip() {
         if (tripActive) {

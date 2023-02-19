@@ -12,12 +12,10 @@ import java.util.*;
 
 public class LootTrackingPanelBox extends JPanel {
     private TrackableItemDrop itemDrop;
-    private int boxType;
-    private LinkedHashMap<String, Object> droppedItemsSummary = new LinkedHashMap<>();
+    private final int boxType;
     private int numberOfKills;
     private String npcName;
     private long totalGeValue;
-    private long lastKillTime;
     private String lastKillTimeFormatted;
     private ArrayList<LootAggregation> lootAggregations;
 
@@ -27,19 +25,6 @@ public class LootTrackingPanelBox extends JPanel {
         this.itemDrop = itemDrop;
         this.boxType = 0;
     }
-
-    // This constructor is used when creating a loot box panel containing multiple drops (e.g., in grouped and trip
-    // mode)
-    LootTrackingPanelBox(LinkedHashMap<String, Object> droppedItemsSummary, String npcName) {
-        this.droppedItemsSummary = droppedItemsSummary;
-        this.npcName = npcName;
-        this.numberOfKills = (int) droppedItemsSummary.get("numberOfDrops");
-        this.totalGeValue = (long) droppedItemsSummary.get("totalGeValue");
-        this.lastKillTime = (long) droppedItemsSummary.get("lastKillTime");
-
-        this.boxType = 1;
-    }
-
     LootTrackingPanelBox(ArrayList<LootAggregation> lootAggregation, String npcName, int numberOfKills, String lastKillTime) {
         this.lootAggregations = lootAggregation;
         this.npcName = npcName;
@@ -47,7 +32,7 @@ public class LootTrackingPanelBox extends JPanel {
         this.lastKillTimeFormatted = lastKillTime;
         totalGeValue = lootAggregations.stream().mapToLong(LootAggregation::getTotalGePrice).sum();
 
-        this.boxType = 2;
+        this.boxType = 1;
     }
 
     JPanel buildPanelBox() {
@@ -87,30 +72,6 @@ public class LootTrackingPanelBox extends JPanel {
                 }
                 break;
             case 1:
-                droppedItemsPanel.setLayout(new GridLayout(0, 1, 2, 2));
-                System.out.println(droppedItemsSummary);
-
-                summaryPanelTitle.setText(npcName + " x" + numberOfKills);
-                dropValueLabel.setText(totalGeValue + "gp");
-
-                Date date = new Date(lastKillTime);
-                Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d YYYY");
-                dropTimeDateLabel.setText("Last kill at: " + format.format(date));
-
-                Set<String> mapKeys = droppedItemsSummary.keySet();
-
-                for (String key : mapKeys) {
-                    if (key != "totalGeValue" && key != "numberOfDrops" && key != "lastKillTime") {
-                        JLabel droppedItemNameLabel = new JLabel();
-                        droppedItemNameLabel.setText(key + " x" + droppedItemsSummary.get(key));
-                        droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
-                        droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
-                        droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
-                        droppedItemsPanel.add(droppedItemNameLabel, BorderLayout.WEST);
-                    }
-                }
-                break;
-            case 2:
                 droppedItemsPanel.setLayout(new GridLayout(0, 2, 2, 2));
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
                 dropValueLabel.setText(totalGeValue + "gp");
