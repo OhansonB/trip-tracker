@@ -32,13 +32,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private static final ImageIcon TRIP_MODE_ICON_UNSELECTED;
     private static final ImageIcon ADD_TRIP_TRACKER_ICON;
     private static final ImageIcon ADD_TRIP_TRACKER_ICON_HOVER;
-    private static final ImageIcon STOP_TRIP_TRACKER_ICON;
-    private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
     private final JRadioButton groupedModeButton = new JRadioButton();
     private final JRadioButton listModeButton = new JRadioButton();
     private final JRadioButton tripModeButton = new JRadioButton();
     private final JButton addTripButton = new JButton();
-    private final JButton stopTripButton = new JButton();
     private final LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
     private LinkedHashMap<String, Trip> tripsMap = new LinkedHashMap<>();
     private JPanel activeTripLootPanel;
@@ -67,11 +64,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         ADD_TRIP_TRACKER_ICON = new ImageIcon(addTripTrackerIcon);
         ADD_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(addTripTrackerIcon, -180));
 
-        // Trip control icons
-        final BufferedImage stopIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/stop_trip_icon.png");
 
-        STOP_TRIP_TRACKER_ICON = new ImageIcon(stopIcon);
-        STOP_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(stopIcon, -180));
     }
 
     EnhancedLootTrackerPanel() {
@@ -205,22 +198,43 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 System.out.println(aKey);
 
                 // Build a trip header with the panel name
-                buildTripHeaderPanel(aKey);
+                for (Trip trip : parentPlugin.getTrips()) {
+                    if (trip.matches(aKey)) {
+                        lootBoxPanel.add(trip.buildHeaderPanel(),1);
+                        lootBoxPanel.revalidate();
+                        lootBoxPanel.repaint();
+                        // Get the trip panels map associated with the given trip and iterate over them
+                        tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
+                            System.out.println(bKey);
+                            System.out.println(bValue);
 
-                // Get the trip panels map associated with the given trip and iterate over them
-                tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
-                    System.out.println(bKey);
-                    System.out.println(bValue);
+                            LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
+                            JPanel panel = panelBox.buildPanelBox();
+                            panel.setName(bKey);
+                            trip.addLootPanel(panel);
+//                            activeTripLootPanel.add(panel, 0);
+//                            activeTripLootPanel.revalidate();
+//                            activeTripLootPanel.repaint();
 
-                    LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
-                    JPanel panel = panelBox.buildPanelBox();
-                    panel.setName(bKey);
+                        });
+                    }
+                }
+//                buildTripHeaderPanel(aKey);
 
-                    activeTripLootPanel.add(panel, 0);
-                    activeTripLootPanel.revalidate();
-                    activeTripLootPanel.repaint();
-
-                });
+//                // Get the trip panels map associated with the given trip and iterate over them
+//                tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
+//                    System.out.println(bKey);
+//                    System.out.println(bValue);
+//
+//                    LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
+//                    JPanel panel = panelBox.buildPanelBox();
+//                    panel.setName(bKey);
+//
+//                    activeTripLootPanel.add(panel, 0);
+//                    activeTripLootPanel.revalidate();
+//                    activeTripLootPanel.repaint();
+//
+//                });
             });
         } else {
             parentPlugin.rebuildLootPanel();
@@ -236,41 +250,40 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String activeTripName) {
-        if (tripActive) {
-            String npcName = npcLootAggregate.getNpcName();
-            int numberOfKills = npcLootAggregate.getNumberOfKills();
-            String lastKillTime = npcLootAggregate.getLastKillTime();
+        String npcName = npcLootAggregate.getNpcName();
+        int numberOfKills = npcLootAggregate.getNumberOfKills();
+        String lastKillTime = npcLootAggregate.getLastKillTime();
 
-            LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
-            JPanel newLootPanel = newDropBox.buildPanelBox();
-            newLootPanel.setName(npcName);
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
+        JPanel newLootPanel = newDropBox.buildPanelBox();
+        newLootPanel.setName(npcName);
 
-            if (activeTripLootPanels.containsKey(npcName)) {
-                Component[] componentList = activeTripLootPanel.getComponents();
-                for(Component c : componentList){
-                    if(c.getName().equals(npcName)){
-                        activeTripLootPanel.remove(c);
-                    }
+        if (activeTripLootPanels.containsKey(npcName)) {
+            Component[] componentList = activeTripLootPanel.getComponents();
+            for(Component c : componentList){
+                if(c.getName().equals(npcName)){
+                    activeTripLootPanel.remove(c);
                 }
-
-                activeTripLootPanels.remove(npcName);
-                activeTripLootPanels.put(npcName, newDropBox);
-            } else {
-                activeTripLootPanels.put(npcName, newDropBox);
             }
 
-            if (tripPanelBoxes.containsKey(activeTripName)) {
-                tripPanelBoxes.remove(activeTripName);
-                tripPanelBoxes.put(activeTripName, activeTripLootPanels);
-            } else {
-                tripPanelBoxes.put(activeTripName, activeTripLootPanels);
-            }
+            activeTripLootPanels.remove(npcName);
+            activeTripLootPanels.put(npcName, newDropBox);
+        } else {
+            activeTripLootPanels.put(npcName, newDropBox);
+        }
 
-            if (selectedTrackingMode == 2) {
-                activeTripLootPanel.add(newLootPanel, 0);
-                activeTripLootPanel.revalidate();
-                activeTripLootPanel.repaint();
-            }
+        if (tripPanelBoxes.containsKey(activeTripName)) {
+            tripPanelBoxes.remove(activeTripName);
+            tripPanelBoxes.put(activeTripName, activeTripLootPanels);
+        } else {
+            tripPanelBoxes.put(activeTripName, activeTripLootPanels);
+        }
+
+        if (selectedTrackingMode == 2) {
+            parentPlugin.getActiveTrip().addLootPanel(newLootPanel);
+//                activeTripLootPanel.add(newLootPanel, 0);
+//                activeTripLootPanel.revalidate();
+//                activeTripLootPanel.repaint();
         }
     }
 
@@ -314,10 +327,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     private void createNewTrip() {
         String tripName;
+        boolean isActiveTrip = parentPlugin.checkForActiveTrip();
 
-        if (!tripActive) {
+        if (!isActiveTrip) {
             if (parentPlugin.getNumberOfTrips() != 0) {
-                int tripNumber = parentPlugin.getNumberOfTrips();
+                int tripNumber = parentPlugin.getNumberOfTrips() + 1;
                 tripName = "TRIP " + tripNumber;
                 parentPlugin.initTrip(tripName);
             } else {
@@ -326,7 +340,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             }
 
             toggleTripStatus(tripName);
-            buildTripHeaderPanel(tripName);
+
+            lootBoxPanel.add(parentPlugin.getActiveTrip().buildHeaderPanel(),1);
+            lootBoxPanel.revalidate();
+            lootBoxPanel.repaint();
+
             activeTripLootPanels = new LinkedHashMap<>();
             tripPanelBoxes.put(tripName, activeTripLootPanels);
             tripsMap.put(tripName, parentPlugin.getActiveTrip());
@@ -340,6 +358,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             switch (selectedOption) {
                 case JOptionPane.YES_OPTION:
                     toggleTripStatus(activeTripName);
+                    parentPlugin.getActiveTrip().setStatus(false);
                     createNewTrip();
 
                     break;
@@ -362,65 +381,65 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     public String getActiveTripName() { return activeTripName; }
 
     public void buildTripHeaderPanel(String tripName) {
-        final JPanel outerPanel = new JPanel();
-        outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        outerPanel.setLayout(new BorderLayout());
-        outerPanel.setBorder(new EmptyBorder(5, 0, 0, 0));
+//        final JPanel outerPanel = new JPanel();
+//        outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+//        outerPanel.setLayout(new BorderLayout());
+//        outerPanel.setBorder(new EmptyBorder(5, 0, 0, 0));
+//
+//        final JPanel innerSummaryPanel = new JPanel();
+//        innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+//        innerSummaryPanel.setLayout(new BorderLayout());
+//        innerSummaryPanel.setBorder(new EmptyBorder(7, 10, 7, 7));
+//        innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
+//        outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
+//
+//        // This label summaries the npc name and level
+//        JLabel summaryPanelTitle = new JLabel(tripName);
+//        summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
+//        summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+//        innerSummaryPanel.add(summaryPanelTitle, BorderLayout.WEST);
+//
+//        activeTripLootPanel = new JPanel();
+//        activeTripLootPanel.setLayout(new BoxLayout(activeTripLootPanel, BoxLayout.Y_AXIS));
+//        outerPanel.add(activeTripLootPanel);
+//
+//        SwingUtil.removeButtonDecorations(stopTripButton);
+//        stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
+//        stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
+//        stopTripButton.setToolTipText("Click to end the trip");
+//        stopTripButton.setBorder(null);
+//
+//        if (stopTripButton.getActionListeners().length == 0) {
+//            stopTripButton.addActionListener(e -> stopTrip());
+//        }
+//
+//        innerSummaryPanel.add(stopTripButton, BorderLayout.EAST);
+//
+//        if (tripActive) {
+//            stopTripButton.setVisible(true);
+//        } else {
+//            JButton deleteTripButton = new JButton();
+//
+//            SwingUtil.removeButtonDecorations(deleteTripButton);
+//            deleteTripButton.setIcon(DELETE_TRIP_TRACKER_ICON);
+//            deleteTripButton.setRolloverIcon(DELETE_TRIP_TRACKER_ICON_HOVER);
+//            deleteTripButton.setToolTipText("Click to delete the trip");
+//            deleteTripButton.setBorder(null);
+//
+//            if (deleteTripButton.getActionListeners().length == 0) {
+//                deleteTripButton.addActionListener(e -> deleteTrip());
+//            }
+//
+//            innerSummaryPanel.add(deleteTripButton, BorderLayout.EAST);
+//        }
 
-        final JPanel innerSummaryPanel = new JPanel();
-        innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerSummaryPanel.setLayout(new BorderLayout());
-        innerSummaryPanel.setBorder(new EmptyBorder(7, 10, 7, 7));
-        innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
-        outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
-
-        // This label summaries the npc name and level
-        JLabel summaryPanelTitle = new JLabel(tripName);
-        summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
-        summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
-        innerSummaryPanel.add(summaryPanelTitle, BorderLayout.WEST);
-
-        activeTripLootPanel = new JPanel();
-        activeTripLootPanel.setLayout(new BoxLayout(activeTripLootPanel, BoxLayout.Y_AXIS));
-        outerPanel.add(activeTripLootPanel);
-
-        SwingUtil.removeButtonDecorations(stopTripButton);
-        stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
-        stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
-        stopTripButton.setToolTipText("Click to end the trip");
-        stopTripButton.setBorder(null);
-
-        if (stopTripButton.getActionListeners().length == 0) {
-            stopTripButton.addActionListener(e -> stopTrip());
-        }
-
-        innerSummaryPanel.add(stopTripButton, BorderLayout.EAST);
-
-        if (tripActive) {
-            stopTripButton.setVisible(true);
-        }
-
-        lootBoxPanel.add(outerPanel,1);
+        lootBoxPanel.add(parentPlugin.getActiveTrip().buildHeaderPanel(),1);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
     }
 
-    public void stopTrip() {
-        if (tripActive) {
-            int selectedOption = JOptionPane.showConfirmDialog(null,
-                    "If you end this trip you will not be able to restart it. Are you sure?",
-                    "Warning!",
-                    JOptionPane.YES_NO_OPTION);
-
-            switch (selectedOption) {
-                case JOptionPane.YES_OPTION:
-                    tripActive = false;
-                    activeTripName = null;
-                    stopTripButton.setVisible(false);
-                    break;
-                case JOptionPane.NO_OPTION:
-                    break;
-            }
-        }
+    public void removeTrip(String tripName) {
+        tripsMap.remove(tripName);
+        rebuildLootPanel();
     }
 }

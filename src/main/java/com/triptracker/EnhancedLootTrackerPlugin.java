@@ -48,6 +48,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private String lastNpcKilled;
 	private final ArrayList<NpcLootAggregate> npcLootAggregates = new ArrayList<>();
 	private final ArrayList<Trip> trips = new ArrayList<>();
+	public boolean activeTripExists = false;
+	public String activeTripName = null;
+	private static int numberOfTrips = 0;
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -131,15 +134,16 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 	}
 
-
 	private void updateGroupedViewUI() {
 		ArrayList<LootAggregation> lootAggregation = getNpcAggregate(lastNpcKilled).aggregateNpcDrops();
 		SwingUtilities.invokeLater(() -> panel.addLootBox(getNpcAggregate(lastNpcKilled), lootAggregation));
 	}
 
 	private void updateCurrentTripUi() {
-		if (panel.getActiveTripName() != null) {
+		if (getActiveTrip() != null) {
 			Trip aTrip = getActiveTrip();
+			System.out.println(aTrip.getTripName() + " is active");
+
 			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
 
 			ArrayList<LootAggregation> tempLootAggregation = null;
@@ -159,6 +163,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			SwingUtilities.invokeLater(() ->
 					panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripName())
 			);
+		} else {
+			System.out.println("getActiveTrip() is null");
 		}
 	}
 
@@ -167,7 +173,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
-		if (panel.getActiveTripName() != null) {
+		if (getActiveTrip() != null) {
 			System.out.println("Adding itemDrop to active trip");
 			Trip trip = getActiveTrip();
 
@@ -258,31 +264,58 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public Trip getActiveTrip() {
 		Trip activeTrip = null;
-		String activeTripName = panel.getActiveTripName();
-		System.out.println("Active trip name is " + activeTripName);
 
 		// Loop through all current trips
 		for (Trip trip : trips) {
-			// If one of those trips is currently marked as active
-			if (trip.isActive(activeTripName)) {
+			System.out.println(trip.getTripName() + ": " + trip.getTripStatus());
+			// If one of those trips is currently marked as active set activeTrip to that trip and break the loop
+			if (trip.getTripStatus()) {
 				activeTrip = trip;
 				break;
-			} else {
-				System.out.println("There is not active trip");
 			}
+		}
+
+		// If no active trip has been found
+		if (activeTrip == null) {
+			System.out.println("There is not an active trip");
 		}
 
 		return activeTrip;
 	}
 
+	public boolean checkForActiveTrip() {
+		// Set a flag for whether there is currently an active trip
+		boolean isActiveTrip = false;
+
+		// Loop through all trips
+		for (Trip trip : trips) {
+
+			// If a trip has tripActive == true
+			if (trip.getTripStatus()) {
+				isActiveTrip = true;
+				break;
+			}
+		}
+
+		activeTripExists = isActiveTrip;
+		return isActiveTrip;
+	}
+
 	public void initTrip(String tripName) {
-		trips.add(new Trip(tripName));
+
+		if (getActiveTrip() != null) {
+			getActiveTrip().setStatus(false);
+		}
+
+		trips.add(new Trip(tripName, this));
+		numberOfTrips++;
+		activeTripName = tripName;
 	}
 
 	public int getNumberOfTrips() {
 		// If size is 0 then the first trip is named trip 1; leading to a situation where if size is 1 then name is
 		// also trip 1. Therefore, trip name is based on size + 1.
-		return trips.size() + 1;
+		return numberOfTrips;
 	}
 
 	public ArrayList<LootAggregation> getItemAggregations(String npcName) {
@@ -359,8 +392,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				break;
 			case 2:
 
-
-
 				break;
 			default:
 				System.out.println("You have tried to switch to a view mode that is not supported");
@@ -370,5 +401,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public ArrayList<LootAggregation> getAggregation(String npcName) {
 		return getNpcAggregate(npcName).getNpcItemAggregations();
+	}
+
+	public ArrayList<Trip> getTrips() {
+		return trips;
+	}
+
+	public void removeTrip(String tripName) {
+		for (int i = 0; i < trips.size(); i++) {
+			if (trips.get(i).getTripName().equals(tripName)) {
+				trips.remove(i);
+				panel.removeTrip(tripName);
+			}
+		}
 	}
 }
