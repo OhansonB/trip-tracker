@@ -259,6 +259,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         newLootPanel.setName(npcName);
 
         if (activeTripLootPanels.containsKey(npcName)) {
+            activeTripLootPanel = parentPlugin.getActiveTrip().getLootPanel();
             Component[] componentList = activeTripLootPanel.getComponents();
             for(Component c : componentList){
                 if(c.getName().equals(npcName)){

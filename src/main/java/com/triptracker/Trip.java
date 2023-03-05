@@ -218,4 +218,8 @@ public class Trip {
         this.lootPanel.revalidate();
         this.lootPanel.repaint();
     }
+
+    public JPanel getLootPanel() {
+        return lootPanel;
+    }
 }
