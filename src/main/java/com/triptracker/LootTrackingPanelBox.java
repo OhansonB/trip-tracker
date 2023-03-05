@@ -6,8 +6,6 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.text.Format;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class LootTrackingPanelBox extends JPanel {
@@ -149,6 +147,4 @@ public class LootTrackingPanelBox extends JPanel {
 
         return outerPanel;
     }
-
-    public String getNpcName() { return npcName; }
 }

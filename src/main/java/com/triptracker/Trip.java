@@ -18,12 +18,12 @@ public class Trip {
     private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
     private static final ImageIcon DELETE_TRIP_TRACKER_ICON;
     private static final ImageIcon DELETE_TRIP_TRACKER_ICON_HOVER;
-    private JLabel statusLabel = new JLabel();
+    private final JLabel statusLabel = new JLabel();
     final String tripName;
     ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
     private JPanel innerSummaryPanel;
     private JPanel lootPanel;
-    private EnhancedLootTrackerPlugin parentPlugin;
+    private final EnhancedLootTrackerPlugin parentPlugin;
     boolean tripActive;
 
     static {
@@ -59,11 +59,12 @@ public class Trip {
     }
 
     public boolean contains(String npcName) {
-        Boolean tripContainsNpc = false;
+        boolean tripContainsNpc = false;
 
         for (NpcLootAggregate npcAggregate : npcAggregations) {
             if (npcAggregate.getNpcName().equals(npcName)) {
                 tripContainsNpc = true;
+                break;
             }
         }
         return tripContainsNpc;
@@ -204,7 +205,7 @@ public class Trip {
     public void setStatus(boolean status) {
         tripActive = status;
 
-        if (tripActive == false) {
+        if (!tripActive) {
             stopTripButton.setVisible(false);
             addDeleteButton();
         } else {

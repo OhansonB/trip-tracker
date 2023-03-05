@@ -23,12 +23,10 @@ public class NpcLootAggregate {
     }
 
     public void addDropToNpcAggregate (TrackableItemDrop itemDrop) {
-        for (TrackableDroppedItem item : itemDrop.getDroppedItems()) {
-            droppedItems.add(item);
-        }
+        droppedItems.addAll(itemDrop.getDroppedItems());
 
         Date date = new Date(System.currentTimeMillis());
-        Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d YYYY");
+        Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
         this.lastKillTime = format.format(date);
 
         numberOfKills++;
@@ -48,9 +46,9 @@ public class NpcLootAggregate {
             // Check if droppedItem is contained in the aggregatedItems list
             if (item.containedIn(aggregatedItems)) {
                 // Find _which_ aggregatedItem it is in the list
-                for (int i = 0; i < aggregatedItems.size(); i++) {
-                    if (aggregatedItems.get(i).matches(item.getItemId())) {
-                        aggregatedItems.get(i).updateItemAggregation(item.getQuantity());
+                for (LootAggregation aggregatedItem : aggregatedItems) {
+                    if (aggregatedItem.matches(item.getItemId())) {
+                        aggregatedItem.updateItemAggregation(item.getQuantity());
                     }
                 }
 

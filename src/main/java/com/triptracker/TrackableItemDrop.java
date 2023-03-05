@@ -3,20 +3,17 @@ package com.triptracker;
 import net.runelite.api.ChatMessageType;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
-import net.runelite.client.config.ConfigManager;
-import net.runelite.client.game.ItemStack;
 
 import java.text.Format;
-import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
 public class TrackableItemDrop {
-    private ArrayList<TrackableDroppedItem> droppedItems;
-    private long dropTimeDate;
-    private String npcName;
-    private int npcCombatLevel;
+    private final ArrayList<TrackableDroppedItem> droppedItems;
+    private final long dropTimeDate;
+    private final String npcName;
+    private final int npcCombatLevel;
     private long totalDropGeValue;
     private long totalDropHaValue;
 
@@ -37,31 +34,31 @@ public class TrackableItemDrop {
     }
 
     String describeTrackableDrop(ChatMessageManager chatMessageManager, EnhancedLootTrackerConfig pluginConfig) {
-        String dropDescription = "";
-        dropDescription += "Drop with value " + totalDropGeValue + " gp ";
-        dropDescription += "received at " + getDateFromLong(dropTimeDate) + " ";
-        dropDescription += "from " + npcName + " ";
+        StringBuilder dropDescription = new StringBuilder();
+        dropDescription.append("Drop with value ").append(totalDropGeValue).append(" gp ");
+        dropDescription.append("received at ").append(getDateFromLong(dropTimeDate)).append(" ");
+        dropDescription.append("from ").append(npcName).append(" ");
 
         if (pluginConfig.showLootInChat()) {
             chatMessageManager.queue(QueuedMessage.builder()
                     .type(ChatMessageType.GAMEMESSAGE)
-                    .runeLiteFormattedMessage(dropDescription)
+                    .runeLiteFormattedMessage(dropDescription.toString())
                     .build());
         }
 
-        dropDescription += "with combat level " + npcCombatLevel + ". ";
-        dropDescription += "Items dropped: \r\n";
+        dropDescription.append("with combat level ").append(npcCombatLevel).append(". ");
+        dropDescription.append("Items dropped: \r\n");
 
         for (final TrackableDroppedItem item: droppedItems) {
-            dropDescription += item.describeTrackableDroppedItem() + "\r\n";
+            dropDescription.append(item.describeTrackableDroppedItem()).append("\r\n");
         }
 
-        return dropDescription;
+        return dropDescription.toString();
     }
 
     String getDateFromLong(long EpochTimeMillis) {
         Date date = new Date(EpochTimeMillis);
-        Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d YYYY");
+        Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
         return format.format(date);
     }
 

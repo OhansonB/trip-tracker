@@ -302,7 +302,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public void initTrip(String tripName) {
-
 		if (getActiveTrip() != null) {
 			getActiveTrip().setStatus(false);
 		}
@@ -318,7 +317,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return numberOfTrips;
 	}
 
-	public ArrayList<LootAggregation> getItemAggregations(String npcName) {
+	public void getItemAggregations(String npcName) {
 		ArrayList<LootAggregation> lootAggregation = null;
 
 		for (NpcLootAggregate npcAggregate : npcLootAggregates) {
@@ -343,7 +342,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			System.out.println("All kills of " + npcName + " are worth " + totalGeValue + "gp.\n");
 		}
 
-		return lootAggregation;
 	}
 
 	public NpcLootAggregate getNpcAggregate(String npcName) {

@@ -7,7 +7,7 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
 
     private final int itemId;
     private final String itemName;
-    private int quantity;
+    private final int quantity;
     private final int gePrice;
     private final int haPrice;
 
@@ -28,8 +28,7 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
     }
 
     String describeTrackableDroppedItem() {
-        String dropDescription = MessageFormat.format("Item Id: {0}, itemName: {1}, quantity: {2}, gePrice: {3}, haPrice: {4}", itemId, itemName, quantity, getTotalGePrice(), getTotalHaPrice());
-        return dropDescription;
+        return MessageFormat.format("Item Id: {0}, itemName: {1}, quantity: {2}, gePrice: {3}, haPrice: {4}", itemId, itemName, quantity, getTotalGePrice(), getTotalHaPrice());
     }
 
     String getItemName() { return itemName; }
@@ -46,8 +45,10 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
     public boolean containedIn(ArrayList<LootAggregation> aggregatedItemList) {
         boolean recordFound = false;
         for (LootAggregation aggregation : aggregatedItemList) {
-            if (aggregation.getItemId() == this.getItemId())
+            if (aggregation.getItemId() == this.getItemId()) {
                 recordFound = true;
+                break;
+            }
         }
         return recordFound;
     }
