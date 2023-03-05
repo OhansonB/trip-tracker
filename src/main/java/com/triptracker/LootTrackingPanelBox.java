@@ -6,6 +6,8 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.*;
 
@@ -17,6 +19,9 @@ public class LootTrackingPanelBox extends JPanel {
     private long totalGeValue;
     private String lastKillTimeFormatted;
     private ArrayList<LootAggregation> lootAggregations;
+    final JPanel dropDetailPanel = new JPanel();
+    final JLabel summaryPanelTitle = new JLabel();
+    final JLabel dropValueLabel = new JLabel();
 
 
     // This constructor is used when creating a loot box panel containing a single drop (e.g., in list view)
@@ -35,8 +40,7 @@ public class LootTrackingPanelBox extends JPanel {
     }
 
     JPanel buildPanelBox() {
-        final JLabel summaryPanelTitle = new JLabel();
-        final JLabel dropValueLabel = new JLabel();
+        dropDetailPanel.setVisible(true);
         final JLabel dropTimeDateLabel = new JLabel();
 
         // This panel contains the grid that shows item drop detail
@@ -129,6 +133,14 @@ public class LootTrackingPanelBox extends JPanel {
         innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerSummaryPanel.setLayout(new BorderLayout());
         innerSummaryPanel.setBorder(new EmptyBorder(7, 7, 7, 7));
+        innerSummaryPanel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) {
+                    toggleCollapse();
+                }
+            }
+        });
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
         // This label summaries the npc name and level
@@ -137,14 +149,12 @@ public class LootTrackingPanelBox extends JPanel {
         innerSummaryPanel.add(summaryPanelTitle, BorderLayout.WEST);
 
         // This label summaries the drop value
-
         dropValueLabel.setFont(FontManager.getRunescapeSmallFont());
         dropValueLabel.setForeground(Color.ORANGE);
         innerSummaryPanel.add(dropValueLabel, BorderLayout.EAST);
 
         // This panel sits under the summary panel and is a parent panel for all other panels showing drop detail
         // such as drop date and dropped items
-        final JPanel dropDetailPanel = new JPanel();
         dropDetailPanel.setBackground(ColorScheme.GRAND_EXCHANGE_LIMIT);
         dropDetailPanel.setLayout(new BorderLayout());
         outerPanel.add(dropDetailPanel);
@@ -183,5 +193,18 @@ public class LootTrackingPanelBox extends JPanel {
         }
 
         return shortenedNumber;
+    }
+
+    private void toggleCollapse() {
+        if (dropDetailPanel.isVisible()) {
+            dropDetailPanel.setVisible(false);
+            summaryPanelTitle.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+            dropValueLabel.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+
+        } else {
+            dropDetailPanel.setVisible(true);
+            summaryPanelTitle.setForeground(Color.ORANGE);
+            dropValueLabel.setForeground(Color.ORANGE);
+        }
     }
 }
