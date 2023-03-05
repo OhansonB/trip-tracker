@@ -5,14 +5,14 @@ import net.runelite.client.game.ItemManager;
 
 public class LootAggregation implements Comparable<LootAggregation> {
     int itemId;
-    int quantity;
+    long quantity;
     String itemName;
     long itemPrice;
     long haPrice;
     ItemManager itemManager;
     ItemComposition itemComposition;
 
-    LootAggregation(int itemId, int quantity, ItemManager itemManager) {
+    LootAggregation(int itemId, long quantity, ItemManager itemManager) {
         this.itemId = itemId;
         this.itemManager = itemManager;
         this.itemComposition = itemManager.getItemComposition(itemId);
@@ -39,11 +39,11 @@ public class LootAggregation implements Comparable<LootAggregation> {
         return itemName;
     }
 
-    public void updateItemAggregation(int quantity) {
+    public void updateItemAggregation(long quantity) {
         this.quantity += quantity;
     }
 
-    public int getQuantity() {
+    public long getQuantity() {
         return quantity;
     }
 

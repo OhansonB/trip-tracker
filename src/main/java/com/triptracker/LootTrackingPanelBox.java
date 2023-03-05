@@ -6,6 +6,7 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class LootTrackingPanelBox extends JPanel {
@@ -46,7 +47,7 @@ public class LootTrackingPanelBox extends JPanel {
             case 0:
                 droppedItemsPanel.setLayout(new GridLayout(0, 2, 2, 2));
                 summaryPanelTitle.setText(itemDrop.getDropNpcName() + " (lvl " + itemDrop.getDropNpcLevel() + ")");
-                dropValueLabel.setText(itemDrop.getTotalDropGeValue() + "gp");
+                dropValueLabel.setText(shortenNumber(itemDrop.getTotalDropGeValue()) + " gp");
                 dropTimeDateLabel.setText(itemDrop.getDateFromLong(itemDrop.getDropTimeDate()));
 
                 ArrayList<TrackableDroppedItem> droppedItems = itemDrop.getDroppedItems();
@@ -54,14 +55,14 @@ public class LootTrackingPanelBox extends JPanel {
 
                 for (final TrackableDroppedItem item: droppedItems) {
                     JLabel droppedItemNameLabel = new JLabel();
-                    droppedItemNameLabel.setText(item.getItemName() + " x" + item.getQuantity());
+                    droppedItemNameLabel.setText(item.getItemName() + " x" + shortenNumber(item.getQuantity()));
                     droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
                     droppedItemsPanel.add(droppedItemNameLabel, BorderLayout.WEST);
 
                     JLabel droppedItemValueLabel = new JLabel();
-                    droppedItemValueLabel.setText(item.getTotalGePrice() + "gp");
+                    droppedItemValueLabel.setText(shortenNumber(item.getTotalGePrice()) + " gp");
                     droppedItemValueLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemValueLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemValueLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -72,23 +73,23 @@ public class LootTrackingPanelBox extends JPanel {
             case 1:
                 droppedItemsPanel.setLayout(new GridLayout(0, 2, 2, 2));
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
-                dropValueLabel.setText(totalGeValue + "gp");
+                dropValueLabel.setText(shortenNumber(totalGeValue) + "gp");
                 dropTimeDateLabel.setText("Last kill at: " + lastKillTimeFormatted);
 
                 Collections.sort(lootAggregations);
 
                 for (LootAggregation lootAggregation : lootAggregations) {
                     String itemName = lootAggregation.getItemName();
-                    int itemQuantity = lootAggregation.getQuantity();
+                    long itemQuantity = lootAggregation.getQuantity();
                     long totalValue = lootAggregation.getTotalGePrice();
 
-                    JLabel droppedItemNameLabel = new JLabel(itemName + " x" + itemQuantity);
+                    JLabel droppedItemNameLabel = new JLabel(itemName + " x" + shortenNumber(itemQuantity));
                     droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
                     droppedItemsPanel.add(droppedItemNameLabel, BorderLayout.WEST);
 
-                    JLabel droppedItemValue = new JLabel(totalValue + "gp", SwingConstants.RIGHT);
+                    JLabel droppedItemValue = new JLabel(shortenNumber(totalValue) + " gp", SwingConstants.RIGHT);
                     droppedItemValue.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemValue.setForeground(Color.LIGHT_GRAY);
                     droppedItemValue.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -98,7 +99,6 @@ public class LootTrackingPanelBox extends JPanel {
             default:
                 break;
         }
-
 
         // Contains all the other panels that constitute the loot box
         final JPanel outerPanel = new JPanel();
@@ -146,5 +146,24 @@ public class LootTrackingPanelBox extends JPanel {
         dropDetailPanel.add(droppedItemsPanel, BorderLayout.SOUTH);
 
         return outerPanel;
+    }
+
+    public String shortenNumber(long numberToShorten) {
+        String shortenedNumber = String.valueOf(numberToShorten);
+
+        if (numberToShorten >= 10000 && numberToShorten <= 999999) {
+            DecimalFormat df = new DecimalFormat("#.#");
+            shortenedNumber = df.format(numberToShorten / 1000.0) + "k";
+            
+        } else if (numberToShorten >= 1000000 && numberToShorten <= 999999999) {
+            DecimalFormat df = new DecimalFormat("#.##");
+            shortenedNumber = df.format(numberToShorten / 1000000.0) + "m";
+
+        } else if (numberToShorten >= 1000000000) {
+            DecimalFormat df = new DecimalFormat("#.###");
+            shortenedNumber = df.format(numberToShorten / 1000000000.0) + "b";
+        }
+
+        return shortenedNumber;
     }
 }

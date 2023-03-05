@@ -7,11 +7,11 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
 
     private final int itemId;
     private final String itemName;
-    private final int quantity;
+    private final long quantity;
     private final int gePrice;
     private final int haPrice;
 
-    TrackableDroppedItem(int itemId, String itemName, int quantity, int gePrice, int haPrice) {
+    TrackableDroppedItem(int itemId, String itemName, long quantity, int gePrice, int haPrice) {
         this.itemId = itemId;
         this.itemName = itemName;
         this.quantity = quantity;
@@ -33,7 +33,7 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
 
     String getItemName() { return itemName; }
 
-    int getQuantity() { return quantity; }
+    long getQuantity() { return quantity; }
 
     int getItemId() { return itemId; }
 

@@ -41,7 +41,7 @@ public class NpcLootAggregate {
         // Loop through each drop associated with this NPC
         for (TrackableDroppedItem item : droppedItems) {
             int droppedItemId = item.getItemId();
-            int droppedItemQuantity = item.getQuantity();
+            long droppedItemQuantity = item.getQuantity();
 
             // Check if droppedItem is contained in the aggregatedItems list
             if (item.containedIn(aggregatedItems)) {
