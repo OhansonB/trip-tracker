@@ -142,7 +142,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void updateCurrentTripUi() {
 		if (getActiveTrip() != null) {
 			Trip aTrip = getActiveTrip();
-			System.out.println(aTrip.getTripName() + " is active");
 
 			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
 
@@ -174,7 +173,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (getActiveTrip() != null) {
-			System.out.println("Adding itemDrop to active trip");
 			Trip trip = getActiveTrip();
 
 			String npcName = itemDrop.getDropNpcName();
@@ -267,7 +265,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Loop through all current trips
 		for (Trip trip : trips) {
-			System.out.println(trip.getTripName() + ": " + trip.getTripStatus());
 			// If one of those trips is currently marked as active set activeTrip to that trip and break the loop
 			if (trip.getTripStatus()) {
 				activeTrip = trip;

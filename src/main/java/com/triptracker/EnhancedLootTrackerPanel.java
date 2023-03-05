@@ -191,7 +191,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
             // tripPanels is a map of trip names to trip panels associated with that trip
             tripPanelBoxes.forEach((aKey, aValue) -> {
-                System.out.println(aKey);
 
                 // Build a trip header with the panel name
                 for (Trip trip : parentPlugin.getTrips()) {
@@ -201,8 +200,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                         lootBoxPanel.repaint();
                         // Get the trip panels map associated with the given trip and iterate over them
                         tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
-                            System.out.println(bKey);
-                            System.out.println(bValue);
 
                             LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
                             JPanel panel = panelBox.buildPanelBox();

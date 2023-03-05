@@ -34,7 +34,6 @@ public class NpcLootAggregate {
     }
 
     public ArrayList<LootAggregation> aggregateNpcDrops() {
-        System.out.println("Generating aggregation");
         // Create an empty list of ItemAggregation objects
         ArrayList<LootAggregation> aggregatedItems = new ArrayList<>();
 
