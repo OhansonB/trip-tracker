@@ -14,10 +14,13 @@ import java.util.ArrayList;
 public class Trip {
     private final JButton stopTripButton = new JButton();
     private final JButton deleteTripButton = new JButton();
+    private final JButton tripInfoButton = new JButton();
     private static final ImageIcon STOP_TRIP_TRACKER_ICON;
     private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
     private static final ImageIcon DELETE_TRIP_TRACKER_ICON;
     private static final ImageIcon DELETE_TRIP_TRACKER_ICON_HOVER;
+    private static final ImageIcon TRIP_INFO_ICON;
+    private static final ImageIcon TRIP_INFO_ICON_HOVER;
     private final JLabel statusLabel = new JLabel();
     final String tripName;
     ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
@@ -30,12 +33,16 @@ public class Trip {
         // Trip control icons
         final BufferedImage stopIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/stop_trip_icon.png");
         final BufferedImage deleteIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/delete_trip_icon.png");
+        final BufferedImage infoIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/info_icon.png");
 
         STOP_TRIP_TRACKER_ICON = new ImageIcon(stopIcon);
         STOP_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(stopIcon, -180));
 
         DELETE_TRIP_TRACKER_ICON = new ImageIcon(deleteIcon);
         DELETE_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(deleteIcon, -180));
+
+        TRIP_INFO_ICON = new ImageIcon(infoIcon);
+        TRIP_INFO_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(infoIcon, -180));
     }
 
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin) {
@@ -101,18 +108,25 @@ public class Trip {
 
         innerSummaryPanel = new JPanel();
         innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerSummaryPanel.setLayout(new BorderLayout());
-        innerSummaryPanel.setBorder(new EmptyBorder(7, 10, 7, 7));
+        innerSummaryPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
         innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
-        // This label summaries the npc name and level
+        // This label summaries the trip name
         JLabel summaryPanelTitle = new JLabel(tripName);
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
-        innerSummaryPanel.add(summaryPanelTitle, BorderLayout.WEST);
 
+        String infoLabelText = "<html>First line<br>Second line</html>";
+        SwingUtil.removeButtonDecorations(tripInfoButton);
+        tripInfoButton.setIcon(TRIP_INFO_ICON);
+        tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
+        tripInfoButton.setToolTipText(infoLabelText);
+        tripInfoButton.setBorder(null);
+
+        innerSummaryPanel.add(summaryPanelTitle);
         innerSummaryPanel.add(statusLabel);
+        innerSummaryPanel.add(tripInfoButton);
 
         lootPanel = new JPanel();
         lootPanel.setLayout(new BoxLayout(lootPanel, BoxLayout.Y_AXIS));
@@ -174,7 +188,7 @@ public class Trip {
                 deleteTripButton.addActionListener(e -> deleteTrip());
             }
 
-            innerSummaryPanel.add(deleteTripButton, BorderLayout.EAST);
+            innerSummaryPanel.add(deleteTripButton);
 
             statusLabel.setText("(inactive)");
         } else {
@@ -193,7 +207,7 @@ public class Trip {
             stopTripButton.addActionListener(e -> stopTrip());
         }
 
-        innerSummaryPanel.add(stopTripButton, BorderLayout.EAST);
+        innerSummaryPanel.add(stopTripButton);
 
         statusLabel.setText("(active)");
     }
