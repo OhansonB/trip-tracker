@@ -7,6 +7,7 @@ import net.runelite.client.util.SwingUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -51,7 +52,8 @@ public class Trip {
 
         this.tripActive = true;
 
-        statusLabel.setBorder(new EmptyBorder(0,10,0,0));
+        statusLabel.setBorder(new EmptyBorder(1,0,0,0));
+        statusLabel.setFont(FontManager.getRunescapeSmallFont());
     }
 
     public void addNpcAggregateToTrip (NpcLootAggregate npcLootAggregate) {
@@ -109,20 +111,19 @@ public class Trip {
         innerSummaryPanel = new JPanel();
         innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerSummaryPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
-        innerSummaryPanel.setPreferredSize(new Dimension(0, 30));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
         // This label summaries the trip name
         JLabel summaryPanelTitle = new JLabel(tripName);
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+        summaryPanelTitle.setBorder(new EmptyBorder(2,0,0,0));
 
         String infoLabelText = "<html>First line<br>Second line</html>";
-        SwingUtil.removeButtonDecorations(tripInfoButton);
+        //SwingUtil.removeButtonDecorations(tripInfoButton);
         tripInfoButton.setIcon(TRIP_INFO_ICON);
         tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
         tripInfoButton.setToolTipText(infoLabelText);
-        tripInfoButton.setBorder(null);
 
         innerSummaryPanel.add(summaryPanelTitle);
         innerSummaryPanel.add(statusLabel);
@@ -182,7 +183,7 @@ public class Trip {
             deleteTripButton.setIcon(DELETE_TRIP_TRACKER_ICON);
             deleteTripButton.setRolloverIcon(DELETE_TRIP_TRACKER_ICON_HOVER);
             deleteTripButton.setToolTipText("Click to delete the trip");
-            deleteTripButton.setBorder(null);
+
 
             if (deleteTripButton.getActionListeners().length == 0) {
                 deleteTripButton.addActionListener(e -> deleteTrip());
@@ -201,7 +202,6 @@ public class Trip {
         stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
         stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
         stopTripButton.setToolTipText("Click to end the trip");
-        stopTripButton.setBorder(null);
 
         if (stopTripButton.getActionListeners().length == 0) {
             stopTripButton.addActionListener(e -> stopTrip());
