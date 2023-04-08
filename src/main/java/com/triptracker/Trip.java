@@ -7,7 +7,6 @@ import net.runelite.client.util.SwingUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -25,7 +24,8 @@ public class Trip {
     private final JLabel statusLabel = new JLabel();
     final String tripName;
     ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
-    private JPanel innerSummaryPanel;
+    private JPanel innerLeftPanel;
+    private JPanel innerRightPanel;
     private JPanel lootPanel;
     private final EnhancedLootTrackerPlugin parentPlugin;
     boolean tripActive;
@@ -52,7 +52,7 @@ public class Trip {
 
         this.tripActive = true;
 
-        statusLabel.setBorder(new EmptyBorder(1,0,0,0));
+        statusLabel.setBorder(new EmptyBorder(5,0,0,0));
         statusLabel.setFont(FontManager.getRunescapeSmallFont());
     }
 
@@ -104,30 +104,40 @@ public class Trip {
 
     public JPanel buildHeaderPanel() {
         final JPanel outerPanel = new JPanel();
-        outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        outerPanel.setBorder(new EmptyBorder(0,0,0,0));
         outerPanel.setLayout(new BorderLayout());
-        outerPanel.setBorder(new EmptyBorder(5, 0, 0, 0));
+        outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        innerSummaryPanel = new JPanel();
-        innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerSummaryPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
-        outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
+        final JPanel innerPanel = new JPanel();
+        innerPanel.setLayout(new GridLayout(0, 2));
+        innerPanel.setPreferredSize(new Dimension(230, 35));
+        outerPanel.add(innerPanel, BorderLayout.PAGE_START);
+
+        innerLeftPanel = new JPanel();
+        innerLeftPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+        innerLeftPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
+        innerPanel.add(innerLeftPanel);
+
+        innerRightPanel = new JPanel();
+        innerRightPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+        innerRightPanel.setLayout(new FlowLayout(FlowLayout.TRAILING));
+        innerPanel.add(innerRightPanel);
 
         // This label summaries the trip name
         JLabel summaryPanelTitle = new JLabel(tripName);
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
-        summaryPanelTitle.setBorder(new EmptyBorder(2,0,0,0));
+        summaryPanelTitle.setBorder(new EmptyBorder(5,0,0,0));
 
         String infoLabelText = "<html>First line<br>Second line</html>";
-        //SwingUtil.removeButtonDecorations(tripInfoButton);
+        SwingUtil.removeButtonDecorations(tripInfoButton);
         tripInfoButton.setIcon(TRIP_INFO_ICON);
         tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
         tripInfoButton.setToolTipText(infoLabelText);
 
-        innerSummaryPanel.add(summaryPanelTitle);
-        innerSummaryPanel.add(statusLabel);
-        innerSummaryPanel.add(tripInfoButton);
+        innerLeftPanel.add(summaryPanelTitle);
+        innerLeftPanel.add(statusLabel);
+        innerRightPanel.add(tripInfoButton);
 
         lootPanel = new JPanel();
         lootPanel.setLayout(new BoxLayout(lootPanel, BoxLayout.Y_AXIS));
@@ -189,7 +199,7 @@ public class Trip {
                 deleteTripButton.addActionListener(e -> deleteTrip());
             }
 
-            innerSummaryPanel.add(deleteTripButton);
+            innerRightPanel.add(deleteTripButton);
 
             statusLabel.setText("(inactive)");
         } else {
@@ -207,7 +217,7 @@ public class Trip {
             stopTripButton.addActionListener(e -> stopTrip());
         }
 
-        innerSummaryPanel.add(stopTripButton);
+        innerRightPanel.add(stopTripButton);
 
         statusLabel.setText("(active)");
     }
