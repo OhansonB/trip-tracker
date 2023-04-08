@@ -9,7 +9,11 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.text.DecimalFormat;
+import java.text.Format;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class Trip {
     private final JButton stopTripButton = new JButton();
@@ -28,6 +32,12 @@ public class Trip {
     private JPanel lootPanel;
     private final EnhancedLootTrackerPlugin parentPlugin;
     boolean tripActive;
+    private String tripStartTime;
+    private long tripStartTimeEpoch;
+    private String tripEndTime;
+    int tripKills;
+    long tripValue;
+    String tooltipText;
 
     static {
         // Trip control icons
@@ -46,10 +56,17 @@ public class Trip {
     }
 
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin) {
-        this.tripName = tripName;
         this.parentPlugin = parentPlugin;
 
+        this.tripName = tripName;
         this.tripActive = true;
+
+        this.tripStartTimeEpoch = System.currentTimeMillis();
+        this.tripStartTime = getFormattedTime();
+        this.tripEndTime = "n/a";
+        this.tripKills = 0;
+        this.tripValue = 0;
+        updateTooltipText();
 
         statusLabel.setBorder(new EmptyBorder(5,0,0,0));
         statusLabel.setFont(FontManager.getRunescapeSmallFont());
@@ -128,13 +145,17 @@ public class Trip {
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
         summaryPanelTitle.setBorder(new EmptyBorder(5,0,0,0));
 
-        String infoLabelText = "<html>First line<br>Second line</html>";
         SwingUtil.removeButtonDecorations(tripInfoButton);
         tripInfoButton.setIcon(TRIP_INFO_ICON);
         tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
-        tripInfoButton.setToolTipText(infoLabelText);
+        tripInfoButton.setToolTipText(tooltipText);
         tripInfoButton.setPreferredSize(new Dimension(15,25));
         tripInfoButton.setBorder(new EmptyBorder(0,0,0,2));
+        tripInfoButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                updateTooltipText();
+            }
+        });
 
         innerLeftPanel.add(summaryPanelTitle);
         innerLeftPanel.add(statusLabel);
@@ -162,8 +183,11 @@ public class Trip {
 
             switch (selectedOption) {
                 case JOptionPane.YES_OPTION:
-                    tripActive = false;
                     stopTripButton.setVisible(false);
+                    tripEndTime = getFormattedTime();
+                    updateTooltipText();
+
+                    tripActive = false;
                     addDeleteButton();
 
                     break;
@@ -196,8 +220,6 @@ public class Trip {
             deleteTripButton.setToolTipText("Click to delete the trip");
             deleteTripButton.setPreferredSize(new Dimension(25,25));
             deleteTripButton.setBorder(new EmptyBorder(0,0,0,10));
-
-
 
             if (deleteTripButton.getActionListeners().length == 0) {
                 deleteTripButton.addActionListener(e -> deleteTrip());
@@ -252,5 +274,81 @@ public class Trip {
 
     public JPanel getLootPanel() {
         return lootPanel;
+    }
+
+    public String getFormattedTime() {
+        Date date = new Date(System.currentTimeMillis());
+        Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
+        return format.format(date);
+    }
+
+    public void updateTooltipText() {
+        if (tripActive) {
+            tooltipText = String.format("""
+            <html>
+            Trip started: %s
+            <br>
+            Trip ended: %s
+            <br>
+            Trip duration: %s
+            <br>
+            Trip kills: %s
+            <br>
+            Trip value: %s gp
+            </html>
+            """, tripStartTime, tripEndTime, calculateTripDuration(), tripKills, shortenNumber(tripValue));
+        }
+
+        tripInfoButton.setToolTipText(tooltipText);
+    }
+
+    public String shortenNumber(long numberToShorten) {
+        String shortenedNumber = String.valueOf(numberToShorten);
+
+        if (numberToShorten >= 10000 && numberToShorten <= 999999) {
+            DecimalFormat df = new DecimalFormat("#.#");
+            shortenedNumber = df.format(numberToShorten / 1000.0) + "k";
+
+        } else if (numberToShorten >= 1000000 && numberToShorten <= 999999999) {
+            DecimalFormat df = new DecimalFormat("#.##");
+            shortenedNumber = df.format(numberToShorten / 1000000.00) + "m";
+
+        } else if (numberToShorten >= 1000000000) {
+            DecimalFormat df = new DecimalFormat("#.###");
+            shortenedNumber = df.format(numberToShorten / 1000000000.000) + "b";
+        }
+
+        return shortenedNumber;
+    }
+
+    public String calculateTripDuration() {
+        long tripDurationSeconds = (System.currentTimeMillis() - tripStartTimeEpoch) / 1000;
+
+        long days = tripDurationSeconds / (24 * 3600);
+        long hours = (tripDurationSeconds % (24 * 3600)) / 3600;
+        long minutes = (tripDurationSeconds % 3600) / 60;
+        long remainingSeconds = tripDurationSeconds % 60;
+
+        String result = "";
+
+        if (days > 0) {
+            result += days + "d ";
+        }
+
+        if (hours > 0) {
+            result += hours + "h ";
+        }
+
+        if (minutes > 0) {
+            result += minutes + "m ";
+        }
+
+        if (remainingSeconds > 0) {
+            result += remainingSeconds + "s";
+        } else {
+            result += "0s";
+        }
+
+        return result.trim();
     }
 }

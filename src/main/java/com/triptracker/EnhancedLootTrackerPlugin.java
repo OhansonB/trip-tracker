@@ -142,6 +142,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void updateCurrentTripUi() {
 		if (getActiveTrip() != null) {
 			Trip aTrip = getActiveTrip();
+			aTrip.tripKills++;
 
 			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
 
@@ -174,6 +175,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (getActiveTrip() != null) {
 			Trip trip = getActiveTrip();
+			trip.tripValue += itemDrop.getTotalDropGeValue();
 
 			String npcName = itemDrop.getDropNpcName();
 			boolean newAggregateRequired = true;
