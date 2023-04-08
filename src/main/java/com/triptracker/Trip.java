@@ -103,7 +103,7 @@ public class Trip {
 
     public JPanel buildHeaderPanel() {
         final JPanel outerPanel = new JPanel();
-        outerPanel.setBorder(new EmptyBorder(0,0,0,0));
+        outerPanel.setBorder(new EmptyBorder(5,0,0,0));
         outerPanel.setLayout(new BorderLayout());
         outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
