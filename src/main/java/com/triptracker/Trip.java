@@ -24,7 +24,6 @@ public class Trip {
     private final JLabel statusLabel = new JLabel();
     final String tripName;
     ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
-    private JPanel innerLeftPanel;
     private JPanel innerRightPanel;
     private JPanel lootPanel;
     private final EnhancedLootTrackerPlugin parentPlugin;
@@ -113,7 +112,7 @@ public class Trip {
         innerPanel.setPreferredSize(new Dimension(230, 35));
         outerPanel.add(innerPanel, BorderLayout.PAGE_START);
 
-        innerLeftPanel = new JPanel();
+        JPanel innerLeftPanel = new JPanel();
         innerLeftPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerLeftPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
         innerPanel.add(innerLeftPanel);
@@ -134,6 +133,8 @@ public class Trip {
         tripInfoButton.setIcon(TRIP_INFO_ICON);
         tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
         tripInfoButton.setToolTipText(infoLabelText);
+        tripInfoButton.setPreferredSize(new Dimension(15,25));
+        tripInfoButton.setBorder(new EmptyBorder(0,0,0,2));
 
         innerLeftPanel.add(summaryPanelTitle);
         innerLeftPanel.add(statusLabel);
@@ -193,6 +194,9 @@ public class Trip {
             deleteTripButton.setIcon(DELETE_TRIP_TRACKER_ICON);
             deleteTripButton.setRolloverIcon(DELETE_TRIP_TRACKER_ICON_HOVER);
             deleteTripButton.setToolTipText("Click to delete the trip");
+            deleteTripButton.setPreferredSize(new Dimension(25,25));
+            deleteTripButton.setBorder(new EmptyBorder(0,0,0,10));
+
 
 
             if (deleteTripButton.getActionListeners().length == 0) {
@@ -212,6 +216,8 @@ public class Trip {
         stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
         stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
         stopTripButton.setToolTipText("Click to end the trip");
+        stopTripButton.setPreferredSize(new Dimension(25,25));
+        stopTripButton.setBorder(new EmptyBorder(0,0,0,10));
 
         if (stopTripButton.getActionListeners().length == 0) {
             stopTripButton.addActionListener(e -> stopTrip());
