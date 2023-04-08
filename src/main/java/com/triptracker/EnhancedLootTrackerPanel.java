@@ -154,7 +154,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         innerPanel.setLayout(new BorderLayout());
         innerPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerPanel.setPreferredSize(new Dimension(0, 30));
-        innerPanel.setBorder(new EmptyBorder(5, 25, 5, 5));
+        innerPanel.setBorder(new EmptyBorder(5, 69, 5, 5));
         outerPanel.add(innerPanel);
 
         JLabel titleLabel = new JLabel();
