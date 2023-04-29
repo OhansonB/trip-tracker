@@ -3,26 +3,37 @@ package com.triptracker;
 import javax.inject.Inject;
 import javax.swing.*;
 
+import com.google.common.collect.*;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.ItemComposition;
-import net.runelite.api.NPC;
+import net.runelite.api.*;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.game.LootManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.loottracker.LootTrackerPlugin;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.game.ItemManager;
+import net.runelite.http.api.loottracker.LootRecordType;
+import org.apache.commons.text.WordUtils;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @PluginDescriptor(
@@ -41,7 +52,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Inject
 	private ItemManager itemManager;
 	@Inject
+	private LootManager lootManager;
+	@Inject
 	private ClientToolbar clientToolbar;
+	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
+	private static final Multimap<String, String> PICKPOCKET_DISAMBIGUATION_MAP = ImmutableMultimap.of(
+			"H.A.M. Member", "Man",
+			"H.A.M. Member", "Woman"
+	);
+	private String lastPickpocketTarget;
+	private InventoryID inventoryId;
+	private Multiset<Integer> inventorySnapshot;
+	private Multiset<Integer> referenceInventorySnapshot;
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
 	private final ArrayList<TrackableItemDrop> listViewDropArray = new ArrayList<>();
@@ -51,6 +73,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public boolean activeTripExists = false;
 	public String activeTripName = null;
 	private static int numberOfTrips = 0;
+	private boolean pickpocketHasOccurred;
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -97,6 +120,88 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		processNewDrop(newItemDrop);
 	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event) {
+		System.out.println("EnhancedLootTrackerPlugin.onChatMessage");
+		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
+		{
+			return;
+		}
+
+		final String message = event.getMessage();
+
+		final Matcher pickpocketMatcher = PICKPOCKET_REGEX.matcher(message);
+		if (pickpocketMatcher.matches())
+		{
+			pickpocketHasOccurred = true;
+
+			// Get the target's name as listed in the chat box
+			String pickpocketTarget = WordUtils.capitalize(pickpocketMatcher.group("target"));
+			lastPickpocketTarget = pickpocketTarget;
+
+			referenceInventorySnapshot = getPlayerInventorySnapshot();
+		}
+	}
+
+	private Multiset<Integer> getPlayerInventorySnapshot() {
+		Multiset<Integer> multiset = HashMultiset.create();
+		final ItemContainer itemContainer = client.getItemContainer(InventoryID.INVENTORY);
+		if (itemContainer != null)
+		{
+			Arrays.stream(itemContainer.getItems())
+					.forEach(item -> multiset.add(item.getId(), item.getQuantity()));
+		}
+
+		return multiset;
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event) {
+		// If the change has occurred in the player's inventory
+		if (event.getContainerId() == InventoryID.INVENTORY.getId()) {
+
+			// pickpocketHasOccurred is set to true as a result of a certain chat message being detected
+			// in onChatMessage
+			if (pickpocketHasOccurred) {
+				// Set to false to signify that the pickpocketing event has been processed
+				pickpocketHasOccurred = false;
+
+				// Get a snapshot of the players inventory (after the change)
+				inventorySnapshot = getPlayerInventorySnapshot();
+
+				// Create a difference between the post-change and pre-change inventory
+				Multiset<Integer> newItems = compareInventorySnapshot(inventorySnapshot, referenceInventorySnapshot);
+
+				// Generate a RuneLite List<ItemStack> object from the difference between current and reference
+				// inventory snapshots
+				final List<ItemStack> itemStacks = newItems.entrySet().stream()
+						.map(e -> new ItemStack(e.getElement(), e.getCount(), client.getLocalPlayer().getLocalLocation()))
+						.collect(Collectors.toList());
+
+				// Create a new itemDrop object
+				TrackableItemDrop itemDrop = new TrackableItemDrop(lastPickpocketTarget, 0);
+
+				// Iterate over itemStacks and create TrackableDroppedItem for each item stack in that list
+				// and add TrackableDroppedItem to TrackableItemDrop
+				for (ItemStack itemStack : itemStacks) {
+					int itemId = itemStack.getId();
+					int itemQuantity = itemStack.getQuantity() > 0 ? itemStack.getQuantity() : 1;
+
+					TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
+					itemDrop.addLootToDrop(newDroppedItem);
+				}
+
+				// Process TrackableItemDrop (add to UI elements and such)
+				processNewDrop(itemDrop);
+			}
+		}
+	}
+
+	private Multiset<Integer> compareInventorySnapshot(Multiset<Integer> multiset1, Multiset<Integer> multiset2) {
+		return Multisets.difference(multiset1, multiset2);
+	}
+
 
 	private TrackableDroppedItem buildTrackableItem(int itemId, int quantity)
 	{
