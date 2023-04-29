@@ -87,7 +87,7 @@ public class LootTrackingPanelBox extends JPanel {
                 break;
             case 1:
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
-                dropValueLabel.setText(shortenNumber(totalGeValue) + "gp");
+                dropValueLabel.setText(shortenNumber(totalGeValue) + " gp");
                 dropTimeDateLabel.setText("Last kill at: " + lastKillTimeFormatted);
 
                 Collections.sort(lootAggregations);
