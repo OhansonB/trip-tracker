@@ -18,6 +18,7 @@ public class TripRecord {
     long tripEndTimeEpoch;
     int tripKills;
     long tripValue;
+    int tripId;
     List<NpcAggregateRecord> npcAggregates;
 
     public static TripRecord fromTrip(Trip trip) {
@@ -30,6 +31,7 @@ public class TripRecord {
         record.tripEndTimeEpoch = trip.getTripEndTimeEpoch();
         record.tripKills = trip.getTripKills();
         record.tripValue = trip.getTripValue();
+        record.tripId = trip.getTripId();
         record.npcAggregates = new ArrayList<>();
 
         for (NpcLootAggregate aggregate : trip.getTripAggregates()) {
@@ -60,7 +62,7 @@ public class TripRecord {
      */
     public Trip toTrip(EnhancedLootTrackerPlugin plugin, ItemManager itemManager) {
         Trip trip = new Trip(tripName, plugin, tripActive, tripStartTimeEpoch,
-                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue);
+                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId);
 
         for (NpcAggregateRecord aggRecord : npcAggregates) {
             NpcLootAggregate aggregate = new NpcLootAggregate(aggRecord.npcName, itemManager);

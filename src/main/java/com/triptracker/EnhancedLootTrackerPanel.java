@@ -34,9 +34,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final JRadioButton tripModeButton = new JRadioButton();
     private final JButton addTripButton = new JButton();
     private final LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
-    private final LinkedHashMap<String, TripPanel> tripsMap = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, TripPanel> tripsMap = new LinkedHashMap<>();
     private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
-    private final LinkedHashMap<String, LinkedHashMap<String, LootTrackingPanelBox>> tripPanelBoxes = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, LinkedHashMap<String, LootTrackingPanelBox>> tripPanelBoxes = new LinkedHashMap<>();
 
     static {
         // Tracker mode control icons
@@ -191,15 +191,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 // Empty state for trip view
                 lootBoxPanel.add(buildEmptyStateLabel("No trips yet \u2014 click + to start one."));
             } else {
-                // tripPanels is a map of trip names to trip panels associated with that trip
-                tripPanelBoxes.forEach((aKey, aValue) -> {
-                    TripPanel tripPanel = tripsMap.get(aKey);
+                // tripPanels is a map of trip IDs to trip panels associated with that trip
+                tripPanelBoxes.forEach((tripId, aValue) -> {
+                    TripPanel tripPanel = tripsMap.get(tripId);
                     if (tripPanel != null) {
                         lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
                         lootBoxPanel.revalidate();
                         lootBoxPanel.repaint();
-                        tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
-                            LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
+                        tripPanelBoxes.get(tripId).forEach((bKey, bValue) -> {
+                            LootTrackingPanelBox panelBox = tripPanelBoxes.get(tripId).get(bKey);
                             JPanel panel = panelBox.buildPanelBox();
                             panel.setName(bKey);
                             tripPanel.addLootPanel(panel);
@@ -260,7 +260,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.repaint();
     }
 
-    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String tripName) {
+    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, int tripId) {
         String npcName = npcLootAggregate.getNpcName();
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
@@ -269,7 +269,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JPanel newLootPanel = newDropBox.buildPanelBox();
         newLootPanel.setName(npcName);
 
-        TripPanel activeTripPanel = tripsMap.get(tripName);
+        TripPanel activeTripPanel = tripsMap.get(tripId);
 
         if (activeTripLootPanels.containsKey(npcName)) {
             if (activeTripPanel != null) {
@@ -288,11 +288,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             activeTripLootPanels.put(npcName, newDropBox);
         }
 
-        if (tripPanelBoxes.containsKey(tripName)) {
-            tripPanelBoxes.remove(tripName);
-            tripPanelBoxes.put(tripName, activeTripLootPanels);
+        if (tripPanelBoxes.containsKey(tripId)) {
+            tripPanelBoxes.remove(tripId);
+            tripPanelBoxes.put(tripId, activeTripLootPanels);
         } else {
-            tripPanelBoxes.put(tripName, activeTripLootPanels);
+            tripPanelBoxes.put(tripId, activeTripLootPanels);
         }
 
         if (selectedTrackingMode == 2 && activeTripPanel != null) {
@@ -344,10 +344,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     public void rebuildAfterLoad() {
         // Register restored trips so the trip view knows about them
         for (Trip trip : parentPlugin.getTrips()) {
-            String name = trip.getTripName();
-            if (!tripsMap.containsKey(name)) {
+            int id = trip.getTripId();
+            if (!tripsMap.containsKey(id)) {
                 TripPanel tripPanel = new TripPanel(trip);
-                tripsMap.put(name, tripPanel);
+                tripsMap.put(id, tripPanel);
 
                 // Build loot panel boxes from the trip's restored NPC aggregates
                 LinkedHashMap<String, LootTrackingPanelBox> lootPanels = new LinkedHashMap<>();
@@ -360,7 +360,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                     LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill);
                     lootPanels.put(npcName, panelBox);
                 }
-                tripPanelBoxes.put(name, lootPanels);
+                tripPanelBoxes.put(id, lootPanels);
             }
         }
 
@@ -374,11 +374,12 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             String tripName = "TRIP " + parentPlugin.getNextTripNumber();
             parentPlugin.initTrip(tripName);
 
-            TripPanel tripPanel = new TripPanel(parentPlugin.getActiveTrip());
-            tripsMap.put(tripName, tripPanel);
+            Trip activeTrip = parentPlugin.getActiveTrip();
+            TripPanel tripPanel = new TripPanel(activeTrip);
+            tripsMap.put(activeTrip.getTripId(), tripPanel);
 
             activeTripLootPanels = new LinkedHashMap<>();
-            tripPanelBoxes.put(tripName, activeTripLootPanels);
+            tripPanelBoxes.put(activeTrip.getTripId(), activeTripLootPanels);
 
             // Rebuild to remove empty state and show the new trip
             rebuildLootPanel();
@@ -391,10 +392,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
             switch (selectedOption) {
                 case JOptionPane.YES_OPTION:
-                    Trip activeTrip = parentPlugin.getActiveTrip();
-                    String activeName = activeTrip.getTripName();
-                    activeTrip.setStatus(false);
-                    TripPanel activePanel = tripsMap.get(activeName);
+                    Trip currentTrip = parentPlugin.getActiveTrip();
+                    currentTrip.setStatus(false);
+                    TripPanel activePanel = tripsMap.get(currentTrip.getTripId());
                     if (activePanel != null) {
                         activePanel.setStatus(false);
                     }
@@ -427,9 +427,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         return footer;
     }
 
-    public void removeTrip(String tripName) {
-        tripsMap.remove(tripName);
-        tripPanelBoxes.remove(tripName);
+    public void removeTrip(int tripId) {
+        tripsMap.remove(tripId);
+        tripPanelBoxes.remove(tripId);
         rebuildLootPanel();
     }
 

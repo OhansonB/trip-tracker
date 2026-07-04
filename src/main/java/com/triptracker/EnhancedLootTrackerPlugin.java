@@ -437,7 +437,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			ArrayList<LootAggregation> lootAggregation = tempLootAggregation;
 
 			SwingUtilities.invokeLater(() ->
-					panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripName())
+					panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripId())
 			);
 		} else {
 			log.debug("getActiveTrip() is null");
@@ -548,21 +548,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	/**
-	 * Returns the next trip number based on the highest existing trip number.
+	 * Returns the next trip number based on the highest existing trip ID.
 	 */
 	public int getNextTripNumber() {
-		int maxNumber = 0;
+		int maxId = 0;
 		for (Trip trip : trips) {
-			String name = trip.getTripName();
-			if (name.startsWith("TRIP ")) {
-				try {
-					int num = Integer.parseInt(name.substring(5));
-					maxNumber = Math.max(maxNumber, num);
-				} catch (NumberFormatException ignored) {
-				}
-			}
+			maxId = Math.max(maxId, trip.getTripId());
 		}
-		return Math.max(maxNumber, numberOfTrips) + 1;
+		return Math.max(maxId, numberOfTrips) + 1;
 	}
 
 	public void getItemAggregations(String npcName) {
@@ -651,8 +644,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void removeTrip(String tripName) {
 		for (int i = 0; i < trips.size(); i++) {
 			if (trips.get(i).getTripName().equals(tripName)) {
+				int tripId = trips.get(i).getTripId();
 				trips.remove(i);
-				panel.removeTrip(tripName);
+				panel.removeTrip(tripId);
 				break;
 			}
 		}

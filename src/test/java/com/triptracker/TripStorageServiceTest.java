@@ -29,6 +29,7 @@ public class TripStorageServiceTest {
         storageService = new TripStorageService(tempDir);
 
         mockPlugin = Mockito.mock(EnhancedLootTrackerPlugin.class);
+        when(mockPlugin.getNextTripNumber()).thenReturn(1);
         mockItemManager = Mockito.mock(ItemManager.class);
         mockComposition = Mockito.mock(net.runelite.api.ItemComposition.class);
 

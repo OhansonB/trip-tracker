@@ -10,7 +10,8 @@ import java.util.Date;
  * Contains no UI logic — see TripPanel for the Swing representation.
  */
 public class Trip {
-    private final String tripName;
+    private final int tripId;
+    private String tripName;
     private final ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
     private final EnhancedLootTrackerPlugin parentPlugin;
     private boolean tripActive;
@@ -23,6 +24,7 @@ public class Trip {
 
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin) {
         this.parentPlugin = parentPlugin;
+        this.tripId = parentPlugin.getNextTripNumber();
         this.tripName = tripName;
         this.tripActive = true;
         this.tripStartTimeEpoch = System.currentTimeMillis();
@@ -37,8 +39,9 @@ public class Trip {
      */
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin, boolean tripActive,
          long tripStartTimeEpoch, String tripStartTime, String tripEndTime,
-         long tripEndTimeEpoch, int tripKills, long tripValue) {
+         long tripEndTimeEpoch, int tripKills, long tripValue, int tripId) {
         this.parentPlugin = parentPlugin;
+        this.tripId = tripId;
         this.tripName = tripName;
         this.tripActive = tripActive;
         this.tripStartTimeEpoch = tripStartTimeEpoch;
@@ -81,6 +84,14 @@ public class Trip {
 
     public String getTripName() {
         return tripName;
+    }
+
+    public void setTripName(String tripName) {
+        this.tripName = tripName;
+    }
+
+    public int getTripId() {
+        return tripId;
     }
 
     public boolean getTripStatus() {

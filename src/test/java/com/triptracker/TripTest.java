@@ -14,6 +14,7 @@ public class TripTest {
     @Before
     public void setUp() {
         mockPlugin = Mockito.mock(EnhancedLootTrackerPlugin.class);
+        Mockito.when(mockPlugin.getNextTripNumber()).thenReturn(1);
         trip = new Trip("TRIP 1", mockPlugin);
     }
 
@@ -86,7 +87,7 @@ public class TripTest {
     @Test
     public void testRestoredTripPreservesData() {
         Trip restored = new Trip("TRIP 5", mockPlugin, false,
-                1000000L, "some start", "some end", 2000000L, 10, 5000);
+                1000000L, "some start", "some end", 2000000L, 10, 5000, 5);
 
         assertEquals("TRIP 5", restored.getTripName());
         assertFalse(restored.getTripStatus());
@@ -96,6 +97,7 @@ public class TripTest {
         assertEquals("some end", restored.getTripEndTime());
         assertEquals(1000000L, restored.getTripStartTimeEpoch());
         assertEquals(2000000L, restored.getTripEndTimeEpoch());
+        assertEquals(5, restored.getTripId());
     }
 
     @Test
@@ -103,5 +105,25 @@ public class TripTest {
         String formatted = Trip.formatTime(0);
         assertNotNull(formatted);
         assertTrue(formatted.contains("on"));
+    }
+
+    @Test
+    public void testTripId() {
+        assertEquals(1, trip.getTripId());
+    }
+
+    @Test
+    public void testRename() {
+        trip.setTripName("Vorkath grind");
+        assertEquals("Vorkath grind", trip.getTripName());
+        // ID should not change
+        assertEquals(1, trip.getTripId());
+    }
+
+    @Test
+    public void testRenameDoesNotAffectMatching() {
+        trip.setTripName("New Name");
+        assertTrue(trip.matches("New Name"));
+        assertFalse(trip.matches("TRIP 1"));
     }
 }

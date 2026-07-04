@@ -73,6 +73,19 @@ public class TripPanel {
         JLabel summaryPanelTitle = new JLabel(trip.getTripName());
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+        summaryPanelTitle.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        summaryPanelTitle.setToolTipText("Click to rename");
+        summaryPanelTitle.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                String newName = JOptionPane.showInputDialog(null,
+                        "Enter new trip name:", trip.getTripName());
+                if (newName != null && !newName.trim().isEmpty()) {
+                    trip.setTripName(newName.trim());
+                    summaryPanelTitle.setText(newName.trim());
+                    trip.getParentPlugin().onTripStatusChanged();
+                }
+            }
+        });
         leftPanel.add(summaryPanelTitle);
 
         // Inline stats: kills | value | duration
