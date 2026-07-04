@@ -14,6 +14,7 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.PlayerLootReceived;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -192,6 +193,24 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		TrackableItemDrop newItemDrop = new TrackableItemDrop(npcName, combat);
 
 		for (final ItemStack item: items) {
+			TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
+			newItemDrop.addLootToDrop(droppedItem);
+		}
+
+		processNewDrop(newItemDrop);
+	}
+
+	@Subscribe
+	public void onPlayerLootReceived(final PlayerLootReceived playerLootReceived) {
+		final String playerName = playerLootReceived.getPlayer().getName();
+		final Collection<ItemStack> items = playerLootReceived.getItems();
+		final int combat = playerLootReceived.getPlayer().getCombatLevel();
+
+		lastNpcKilled = playerName;
+
+		TrackableItemDrop newItemDrop = new TrackableItemDrop(playerName, combat);
+
+		for (final ItemStack item : items) {
 			TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
 			newItemDrop.addLootToDrop(droppedItem);
 		}
