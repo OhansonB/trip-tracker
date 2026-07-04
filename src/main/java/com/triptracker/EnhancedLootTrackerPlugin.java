@@ -59,8 +59,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			"H.A.M. Member", "Woman"
 	);
 
-	private static final int COINS_ID = 995;
-
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
 			22521, 22522, 22523, 22524, 22525, 22526, 22527, 22528, 22529, 22530,
@@ -244,16 +242,15 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					int itemId = itemStack.getId();
 					int itemQuantity = itemStack.getQuantity() > 0 ? itemStack.getQuantity() : 1;
 
-					// Replace coin pouches with coins at the estimated value for this NPC
+					// Coin pouches have no GE value, so we assign the estimated coin value per pouch
 					if (COIN_POUCH_IDS.contains(itemId)) {
-						int estimatedCoins = coinValuePerPouch * itemQuantity;
-						TrackableDroppedItem coinItem = new TrackableDroppedItem(
-								COINS_ID,
-								"Coins",
-								estimatedCoins,
-								1,
-								1);
-						itemDrop.addLootToDrop(coinItem);
+						TrackableDroppedItem pouchItem = new TrackableDroppedItem(
+								itemId,
+								"Coin pouch",
+								itemQuantity,
+								coinValuePerPouch,
+								coinValuePerPouch);
+						itemDrop.addLootToDrop(pouchItem);
 					} else {
 						TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
 						itemDrop.addLootToDrop(newDroppedItem);
