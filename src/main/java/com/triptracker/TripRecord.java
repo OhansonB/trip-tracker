@@ -64,21 +64,35 @@ public class TripRecord {
         Trip trip = new Trip(tripName, plugin, tripActive, tripStartTimeEpoch,
                 tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId);
 
+        if (npcAggregates == null) {
+            return trip;
+        }
+
         for (NpcAggregateRecord aggRecord : npcAggregates) {
+            if (aggRecord == null || aggRecord.npcName == null) {
+                continue;
+            }
+
             NpcLootAggregate aggregate = new NpcLootAggregate(aggRecord.npcName, itemManager);
 
             // Restore items into the aggregate
-            for (DropRecord.ItemRecord itemRecord : aggRecord.items) {
-                TrackableDroppedItem item = new TrackableDroppedItem(
-                        itemRecord.itemId, itemRecord.itemName,
-                        itemRecord.quantity, itemRecord.gePrice, itemRecord.haPrice);
-                aggregate.getDroppedItems().add(item);
+            if (aggRecord.items != null) {
+                for (DropRecord.ItemRecord itemRecord : aggRecord.items) {
+                    if (itemRecord == null) {
+                        continue;
+                    }
+                    TrackableDroppedItem item = new TrackableDroppedItem(
+                            itemRecord.itemId, itemRecord.itemName,
+                            itemRecord.quantity, itemRecord.gePrice, itemRecord.haPrice);
+                    aggregate.getDroppedItems().add(item);
+                }
             }
 
             // Restore kill count and last kill time directly
             aggregate.numberOfKills = aggRecord.numberOfKills;
             aggregate.lastKillTime = aggRecord.lastKillTime;
-            aggregate.lootAggregations = aggregate.aggregateNpcDrops();
+            // Rebuild the aggregation map from the restored items
+            aggregate.rebuildAggregationMap();
 
             trip.addNpcAggregateToTrip(aggregate);
         }

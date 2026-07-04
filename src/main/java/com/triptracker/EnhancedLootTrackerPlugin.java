@@ -30,11 +30,16 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -122,14 +127,20 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private Multiset<Integer> referenceInventorySnapshot;
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
-	private final ArrayList<TrackableItemDrop> listViewDropArray = new ArrayList<>();
+	private final List<TrackableItemDrop> listViewDropArray = Collections.synchronizedList(new ArrayList<>());
 	private String lastNpcKilled;
-	private final ArrayList<NpcLootAggregate> npcLootAggregates = new ArrayList<>();
-	private final ArrayList<Trip> trips = new ArrayList<>();
-	private int numberOfTrips = 0;
+	private final List<NpcLootAggregate> npcLootAggregates = Collections.synchronizedList(new ArrayList<>());
+	private final List<Trip> trips = Collections.synchronizedList(new ArrayList<>());
 	private boolean pickpocketHasOccurred;
 	private boolean chestLooted;
 	private TripStorageService storageService;
+
+	// Debounce persistence: save at most once every 5 seconds
+	private static final long SAVE_DEBOUNCE_MS = 5000;
+	private ScheduledExecutorService debounceExecutor;
+	private ScheduledFuture<?> pendingDropSave;
+	private ScheduledFuture<?> pendingTripSave;
+	private final Object saveLock = new Object();
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -144,6 +155,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Override
 	protected void startUp() throws Exception {
 		storageService = new TripStorageService();
+
+		debounceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "trip-tracker-debounce");
+			t.setDaemon(true);
+			return t;
+		});
 
 		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
 		panel.setParentPlugin(this);
@@ -165,6 +182,17 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Override
 	protected void shutDown() throws Exception {
+		// Cancel any pending debounced saves
+		synchronized (saveLock) {
+			if (pendingDropSave != null) {
+				pendingDropSave.cancel(false);
+			}
+			if (pendingTripSave != null) {
+				pendingTripSave.cancel(false);
+			}
+		}
+		debounceExecutor.shutdown();
+
 		// Persist data synchronously before shutdown, then clean up the executor
 		storageService.saveTripsSync(trips);
 		storageService.saveDropsSync(listViewDropArray);
@@ -196,7 +224,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 			Trip trip = record.toTrip(this, itemManager);
 			trips.add(trip);
-			numberOfTrips++;
 		}
 
 		log.debug("Loaded {} drops and {} trips from disk", dropRecords.size(), tripRecords.size());
@@ -322,23 +349,26 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			String type = clueMatcher.group(2);
 			String eventName = "Clue Scroll (" + type.substring(0, 1).toUpperCase() + type.substring(1) + ")";
 
-			// Clue rewards use the same container as Barrows (TRAIL_REWARDINV)
-			@SuppressWarnings("deprecation")
-			int containerId = net.runelite.api.InventoryID.BARROWS_REWARD.getId();
-			final ItemContainer container = client.getItemContainer(containerId);
-			if (container != null) {
-				lastNpcKilled = eventName;
-				TrackableItemDrop clueReward = new TrackableItemDrop(eventName, 0);
-				for (Item item : container.getItems()) {
-					if (item.getId() > -1 && item.getQuantity() > 0) {
-						TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
-						clueReward.addLootToDrop(droppedItem);
+			// Defer clue reward processing to the next game tick — the container
+			// may not be populated yet when the chat message fires
+			clientThread.invokeLater(() -> {
+				@SuppressWarnings("deprecation")
+				int containerId = net.runelite.api.InventoryID.BARROWS_REWARD.getId();
+				final ItemContainer container = client.getItemContainer(containerId);
+				if (container != null) {
+					lastNpcKilled = eventName;
+					TrackableItemDrop clueReward = new TrackableItemDrop(eventName, 0);
+					for (Item item : container.getItems()) {
+						if (item.getId() > -1 && item.getQuantity() > 0) {
+							TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
+							clueReward.addLootToDrop(droppedItem);
+						}
+					}
+					if (!clueReward.getDroppedItems().isEmpty()) {
+						processNewDrop(clueReward);
 					}
 				}
-				if (!clueReward.getDroppedItems().isEmpty()) {
-					processNewDrop(clueReward);
-				}
-			}
+			});
 		}
 
 		// Chat-triggered inventory-diff loot sources
@@ -526,36 +556,44 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		// Trim if over limit
 		int maxDrops = config.maxDrops();
 		boolean trimmed = false;
-		while (listViewDropArray.size() > maxDrops) {
-			listViewDropArray.remove(0);
-			trimmed = true;
+		synchronized (listViewDropArray) {
+			while (listViewDropArray.size() > maxDrops) {
+				listViewDropArray.remove(0);
+				trimmed = true;
+			}
 		}
 
 		int maxTrips = config.maxTrips();
-		while (trips.size() > maxTrips) {
-			trips.remove(0);
+		synchronized (trips) {
+			while (trips.size() > maxTrips) {
+				trips.remove(0);
+			}
 		}
 
 		// If trimmed, rebuild aggregates from scratch and refresh UI
 		if (trimmed) {
-			npcLootAggregates.clear();
-			for (TrackableItemDrop drop : listViewDropArray) {
-				String npcName = drop.getDropNpcName();
-				NpcLootAggregate existing = null;
-				for (NpcLootAggregate agg : npcLootAggregates) {
-					if (agg.getNpcName().equals(npcName)) {
-						existing = agg;
-						break;
+			synchronized (npcLootAggregates) {
+				npcLootAggregates.clear();
+				synchronized (listViewDropArray) {
+					for (TrackableItemDrop drop : listViewDropArray) {
+						String npcName = drop.getDropNpcName();
+						NpcLootAggregate existing = null;
+						for (NpcLootAggregate agg : npcLootAggregates) {
+							if (agg.getNpcName().equals(npcName)) {
+								existing = agg;
+								break;
+							}
+						}
+						if (existing == null) {
+							NpcLootAggregate newAgg = new NpcLootAggregate(npcName, itemManager);
+							newAgg.addDropToNpcAggregate(drop);
+							npcLootAggregates.add(newAgg);
+						} else {
+							existing.addDropToNpcAggregate(drop);
+							npcLootAggregates.remove(existing);
+							npcLootAggregates.add(existing);
+						}
 					}
-				}
-				if (existing == null) {
-					NpcLootAggregate newAgg = new NpcLootAggregate(npcName, itemManager);
-					newAgg.addDropToNpcAggregate(drop);
-					npcLootAggregates.add(newAgg);
-				} else {
-					existing.addDropToNpcAggregate(drop);
-					npcLootAggregates.remove(existing);
-					npcLootAggregates.add(existing);
 				}
 			}
 
@@ -581,14 +619,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 		}
 
-		// Persist after every drop (async, non-blocking)
-		storageService.saveDrops(listViewDropArray);
-		storageService.saveTrips(trips);
+		// Debounced persistence — save at most once every SAVE_DEBOUNCE_MS
+		scheduleDebouncedSave();
 	}
 
 	private void updateGroupedViewUI() {
-		ArrayList<LootAggregation> lootAggregation = getNpcAggregate(lastNpcKilled).aggregateNpcDrops();
-		SwingUtilities.invokeLater(() -> panel.addLootBox(getNpcAggregate(lastNpcKilled), lootAggregation));
+		NpcLootAggregate aggregate = getNpcAggregate(lastNpcKilled);
+		if (aggregate == null) {
+			log.debug("No aggregate found for NPC: {}", lastNpcKilled);
+			return;
+		}
+		ArrayList<LootAggregation> lootAggregation = aggregate.aggregateNpcDrops();
+		SwingUtilities.invokeLater(() -> panel.addLootBox(aggregate, lootAggregation));
 	}
 
 	private void updateCurrentTripUi() {
@@ -620,8 +662,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 	}
 
-	public ArrayList<TrackableItemDrop> getListViewDropArray() {
-		return listViewDropArray;
+	public List<TrackableItemDrop> getListViewDropArray() {
+		synchronized (listViewDropArray) {
+			return new ArrayList<>(listViewDropArray);
+		}
 	}
 
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
@@ -655,23 +699,25 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void addDropToGroupedAggregates(TrackableItemDrop itemDrop) {
 		String npcName = itemDrop.getDropNpcName();
 
-		NpcLootAggregate existing = null;
-		for (NpcLootAggregate agg : npcLootAggregates) {
-			if (agg.getNpcName().equals(npcName)) {
-				existing = agg;
-				break;
+		synchronized (npcLootAggregates) {
+			NpcLootAggregate existing = null;
+			for (NpcLootAggregate agg : npcLootAggregates) {
+				if (agg.getNpcName().equals(npcName)) {
+					existing = agg;
+					break;
+				}
 			}
-		}
 
-		if (existing == null) {
-			NpcLootAggregate newAggregate = new NpcLootAggregate(npcName, itemManager);
-			newAggregate.addDropToNpcAggregate(itemDrop);
-			npcLootAggregates.add(newAggregate);
-		} else {
-			existing.addDropToNpcAggregate(itemDrop);
-			// Move to end so most-recently-updated NPCs appear first when list is iterated in reverse
-			npcLootAggregates.remove(existing);
-			npcLootAggregates.add(existing);
+			if (existing == null) {
+				NpcLootAggregate newAggregate = new NpcLootAggregate(npcName, itemManager);
+				newAggregate.addDropToNpcAggregate(itemDrop);
+				npcLootAggregates.add(newAggregate);
+			} else {
+				existing.addDropToNpcAggregate(itemDrop);
+				// Move to end so most-recently-updated NPCs appear first when list is iterated in reverse
+				npcLootAggregates.remove(existing);
+				npcLootAggregates.add(existing);
+			}
 		}
 
 		getItemAggregations(npcName);
@@ -679,29 +725,22 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 
 	public Trip getActiveTrip() {
-		Trip activeTrip = null;
-
-		// Loop through all current trips
-		for (Trip trip : trips) {
-			// If one of those trips is currently marked as active set activeTrip to that trip and break the loop
-			if (trip.getTripStatus()) {
-				activeTrip = trip;
-				break;
+		synchronized (trips) {
+			for (Trip trip : trips) {
+				if (trip.getTripStatus()) {
+					return trip;
+				}
 			}
 		}
-
-		// If no active trip has been found
-		if (activeTrip == null) {
-			log.debug("There is not an active trip");
-		}
-
-		return activeTrip;
+		return null;
 	}
 
 	public boolean checkForActiveTrip() {
-		for (Trip trip : trips) {
-			if (trip.getTripStatus()) {
-				return true;
+		synchronized (trips) {
+			for (Trip trip : trips) {
+				if (trip.getTripStatus()) {
+					return true;
+				}
 			}
 		}
 		return false;
@@ -713,14 +752,13 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 
 		trips.add(new Trip(tripName, this));
-		numberOfTrips++;
 
-		// Persist trip state change
-		storageService.saveTrips(trips);
+		// Persist trip state change (debounced)
+		scheduleDebouncedTripSave();
 	}
 
 	public int getNumberOfTrips() {
-		return numberOfTrips;
+		return trips.size();
 	}
 
 	/**
@@ -728,10 +766,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	 */
 	public int getNextTripNumber() {
 		int maxId = 0;
-		for (Trip trip : trips) {
-			maxId = Math.max(maxId, trip.getTripId());
+		synchronized (trips) {
+			for (Trip trip : trips) {
+				maxId = Math.max(maxId, trip.getTripId());
+			}
 		}
-		return Math.max(maxId, numberOfTrips) + 1;
+		return Math.max(maxId, trips.size()) + 1;
 	}
 
 	public void getItemAggregations(String npcName) {
@@ -741,9 +781,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		ArrayList<LootAggregation> lootAggregation = null;
 
-		for (NpcLootAggregate npcAggregate : npcLootAggregates) {
-			if (npcAggregate.getNpcName().equals(npcName)) {
-				lootAggregation = npcAggregate.getNpcItemAggregations();
+		synchronized (npcLootAggregates) {
+			for (NpcLootAggregate npcAggregate : npcLootAggregates) {
+				if (npcAggregate.getNpcName().equals(npcName)) {
+					lootAggregation = npcAggregate.getNpcItemAggregations();
+				}
 			}
 		}
 
@@ -762,15 +804,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public NpcLootAggregate getNpcAggregate(String npcName) {
-		NpcLootAggregate tempAggregate = null;
-
-		for (NpcLootAggregate npcAggregate : npcLootAggregates) {
-			if (npcAggregate.getNpcName().equals(npcName)) {
-				tempAggregate = npcAggregate;
-				break;
+		synchronized (npcLootAggregates) {
+			for (NpcLootAggregate npcAggregate : npcLootAggregates) {
+				if (npcAggregate.getNpcName().equals(npcName)) {
+					return npcAggregate;
+				}
 			}
 		}
-		return tempAggregate;
+		return null;
 	}
 
 	private void updateItemMaps(TrackableItemDrop newItemDrop) {
@@ -787,16 +828,23 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		TrackingMode mode = TrackingMode.fromId(panel.getSelectedTrackingMode());
 		switch (mode) {
 			case LIST:
-				for (TrackableItemDrop itemDrop : getListViewDropArray()) {
+				List<TrackableItemDrop> dropsCopy = getListViewDropArray();
+				for (TrackableItemDrop itemDrop : dropsCopy) {
 					panel.addLootBox(itemDrop);
 				}
 				break;
 
 			case GROUPED:
-				for (NpcLootAggregate npcAggregate : npcLootAggregates) {
-					String npcName = npcAggregate.getNpcName();
-					ArrayList<LootAggregation> npcsLootAggregation = getAggregation(npcName);
-					SwingUtilities.invokeLater(() -> panel.addLootBox(getNpcAggregate(npcName), npcsLootAggregation));
+				synchronized (npcLootAggregates) {
+					for (NpcLootAggregate npcAggregate : npcLootAggregates) {
+						String npcName = npcAggregate.getNpcName();
+						ArrayList<LootAggregation> npcsLootAggregation = npcAggregate.getNpcItemAggregations();
+						if (npcsLootAggregation != null) {
+							final NpcLootAggregate aggRef = npcAggregate;
+							final ArrayList<LootAggregation> aggList = npcsLootAggregation;
+							SwingUtilities.invokeLater(() -> panel.addLootBox(aggRef, aggList));
+						}
+					}
 				}
 				break;
 
@@ -813,25 +861,29 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return getNpcAggregate(npcName).getNpcItemAggregations();
 	}
 
-	public ArrayList<Trip> getTrips() {
-		return trips;
+	public List<Trip> getTrips() {
+		synchronized (trips) {
+			return new ArrayList<>(trips);
+		}
 	}
 
 	public void removeTrip(String tripName) {
-		for (int i = 0; i < trips.size(); i++) {
-			if (trips.get(i).getTripName().equals(tripName)) {
-				int tripId = trips.get(i).getTripId();
-				trips.remove(i);
-				panel.removeTrip(tripId);
-				break;
+		synchronized (trips) {
+			for (int i = 0; i < trips.size(); i++) {
+				if (trips.get(i).getTripName().equals(tripName)) {
+					int tripId = trips.get(i).getTripId();
+					trips.remove(i);
+					panel.removeTrip(tripId);
+					break;
+				}
 			}
 		}
 		// Persist after trip removal
-		storageService.saveTrips(trips);
+		scheduleDebouncedTripSave();
 	}
 
 	public void onTripStatusChanged() {
-		storageService.saveTrips(trips);
+		scheduleDebouncedTripSave();
 	}
 
 	/**
@@ -854,14 +906,67 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	 * Clears all persisted and in-memory loot data (drops, trips, aggregates).
 	 */
 	public void clearAllData() {
-		listViewDropArray.clear();
-		npcLootAggregates.clear();
-		trips.clear();
-		numberOfTrips = 0;
+		synchronized (listViewDropArray) {
+			listViewDropArray.clear();
+		}
+		synchronized (npcLootAggregates) {
+			npcLootAggregates.clear();
+		}
+		synchronized (trips) {
+			trips.clear();
+		}
 
-		storageService.saveDrops(listViewDropArray);
-		storageService.saveTrips(trips);
+		storageService.saveDrops(new ArrayList<>());
+		storageService.saveTrips(new ArrayList<>());
 
 		SwingUtilities.invokeLater(() -> panel.rebuildAfterClear());
+	}
+
+	/**
+	 * Schedules a debounced save for both drops and trips.
+	 * If a save is already pending, it is cancelled and rescheduled.
+	 */
+	private void scheduleDebouncedSave() {
+		synchronized (saveLock) {
+			if (pendingDropSave != null && !pendingDropSave.isDone()) {
+				pendingDropSave.cancel(false);
+			}
+			if (pendingTripSave != null && !pendingTripSave.isDone()) {
+				pendingTripSave.cancel(false);
+			}
+			pendingDropSave = debounceExecutor.schedule(() -> {
+				List<TrackableItemDrop> dropsCopy;
+				synchronized (listViewDropArray) {
+					dropsCopy = new ArrayList<>(listViewDropArray);
+				}
+				storageService.saveDrops(dropsCopy);
+			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+
+			pendingTripSave = debounceExecutor.schedule(() -> {
+				List<Trip> tripsCopy;
+				synchronized (trips) {
+					tripsCopy = new ArrayList<>(trips);
+				}
+				storageService.saveTrips(tripsCopy);
+			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+		}
+	}
+
+	/**
+	 * Schedules a debounced save for trips only.
+	 */
+	private void scheduleDebouncedTripSave() {
+		synchronized (saveLock) {
+			if (pendingTripSave != null && !pendingTripSave.isDone()) {
+				pendingTripSave.cancel(false);
+			}
+			pendingTripSave = debounceExecutor.schedule(() -> {
+				List<Trip> tripsCopy;
+				synchronized (trips) {
+					tripsCopy = new ArrayList<>(trips);
+				}
+				storageService.saveTrips(tripsCopy);
+			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+		}
 	}
 }

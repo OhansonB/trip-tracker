@@ -6,6 +6,8 @@ import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class NpcLootAggregate {
     final String npcName;
@@ -15,6 +17,9 @@ public class NpcLootAggregate {
     String lastKillTime;
     ArrayList<LootAggregation> lootAggregations;
 
+    // O(1) lookup map keyed by item ID for efficient aggregation
+    private final LinkedHashMap<Integer, LootAggregation> aggregationMap = new LinkedHashMap<>();
+
     NpcLootAggregate(String npcName, ItemManager itemManager) {
         this.npcName = npcName;
         this.itemManager = itemManager;
@@ -22,7 +27,7 @@ public class NpcLootAggregate {
         droppedItems = new ArrayList<>();
     }
 
-    public void addDropToNpcAggregate (TrackableItemDrop itemDrop) {
+    public void addDropToNpcAggregate(TrackableItemDrop itemDrop) {
         droppedItems.addAll(itemDrop.getDroppedItems());
 
         // Use the drop's timestamp for the last kill time
@@ -31,36 +36,65 @@ public class NpcLootAggregate {
         this.lastKillTime = format.format(date);
 
         numberOfKills++;
-        this.lootAggregations = aggregateNpcDrops();
-    }
 
-    public ArrayList<LootAggregation> aggregateNpcDrops() {
-        // Create an empty list of ItemAggregation objects
-        ArrayList<LootAggregation> aggregatedItems = new ArrayList<>();
-
-        // Loop through each drop associated with this NPC
-        for (TrackableDroppedItem item : droppedItems) {
-            int droppedItemId = item.getItemId();
-            long droppedItemQuantity = item.getQuantity();
-
-            // Check if droppedItem is contained in the aggregatedItems list
-            if (item.containedIn(aggregatedItems)) {
-                // Find _which_ aggregatedItem it is in the list
-                for (LootAggregation aggregatedItem : aggregatedItems) {
-                    if (aggregatedItem.matches(item.getItemId())) {
-                        aggregatedItem.updateItemAggregation(item.getQuantity());
-                    }
-                }
-
+        // Incrementally update the aggregation map with new items (O(n) per drop, not O(n²))
+        for (TrackableDroppedItem item : itemDrop.getDroppedItems()) {
+            int itemId = item.getItemId();
+            LootAggregation existing = aggregationMap.get(itemId);
+            if (existing != null) {
+                existing.updateItemAggregation(item.getQuantity());
             } else {
-                // The item is not in the array yet
-                aggregatedItems.add(new LootAggregation(droppedItemId, droppedItemQuantity, itemManager));
+                LootAggregation newAgg = new LootAggregation(itemId, item.getQuantity(), itemManager);
+                aggregationMap.put(itemId, newAgg);
             }
         }
 
-        // This should be an array list where each unique item dropped for this NPC has an object with the quantity
-        // of that item that has dropped
-        return aggregatedItems;
+        this.lootAggregations = new ArrayList<>(aggregationMap.values());
+    }
+
+    /**
+     * Returns the aggregated drop list. Uses the pre-computed aggregation map for O(1) access.
+     * This method is retained for backward compatibility but now simply returns the cached list.
+     */
+    public ArrayList<LootAggregation> aggregateNpcDrops() {
+        if (lootAggregations != null) {
+            return lootAggregations;
+        }
+        // Fallback: rebuild from scratch (only needed for freshly constructed aggregates with no drops)
+        return rebuildAggregations();
+    }
+
+    /**
+     * Rebuilds the aggregation map from the raw dropped items list.
+     * Used after deserialization when items are added directly to droppedItems.
+     */
+    public void rebuildAggregationMap() {
+        aggregationMap.clear();
+        for (TrackableDroppedItem item : droppedItems) {
+            int itemId = item.getItemId();
+            LootAggregation existing = aggregationMap.get(itemId);
+            if (existing != null) {
+                existing.updateItemAggregation(item.getQuantity());
+            } else {
+                aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+            }
+        }
+        this.lootAggregations = new ArrayList<>(aggregationMap.values());
+    }
+
+    private ArrayList<LootAggregation> rebuildAggregations() {
+        aggregationMap.clear();
+        for (TrackableDroppedItem item : droppedItems) {
+            int itemId = item.getItemId();
+            LootAggregation existing = aggregationMap.get(itemId);
+            if (existing != null) {
+                existing.updateItemAggregation(item.getQuantity());
+            } else {
+                aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+            }
+        }
+        this.lootAggregations = new ArrayList<>(aggregationMap.values());
+        return lootAggregations;
     }
 
     public String getNpcName() {

@@ -271,7 +271,14 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         TripPanel activeTripPanel = tripsMap.get(tripId);
 
-        if (activeTripLootPanels.containsKey(npcName)) {
+        // Always look up the loot panels map by trip ID to avoid stale reference bugs
+        LinkedHashMap<String, LootTrackingPanelBox> tripLootPanels = tripPanelBoxes.get(tripId);
+        if (tripLootPanels == null) {
+            tripLootPanels = new LinkedHashMap<>();
+            tripPanelBoxes.put(tripId, tripLootPanels);
+        }
+
+        if (tripLootPanels.containsKey(npcName)) {
             if (activeTripPanel != null) {
                 JPanel tripLootPanel = activeTripPanel.getLootPanel();
                 Component[] componentList = tripLootPanel.getComponents();
@@ -282,17 +289,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 }
             }
 
-            activeTripLootPanels.remove(npcName);
-            activeTripLootPanels.put(npcName, newDropBox);
+            tripLootPanels.remove(npcName);
+            tripLootPanels.put(npcName, newDropBox);
         } else {
-            activeTripLootPanels.put(npcName, newDropBox);
+            tripLootPanels.put(npcName, newDropBox);
         }
 
+        // Keep activeTripLootPanels in sync for the current active trip
         if (tripPanelBoxes.containsKey(tripId)) {
-            tripPanelBoxes.remove(tripId);
-            tripPanelBoxes.put(tripId, activeTripLootPanels);
-        } else {
-            tripPanelBoxes.put(tripId, activeTripLootPanels);
+            activeTripLootPanels = tripLootPanels;
         }
 
         if (selectedTrackingMode == 2 && activeTripPanel != null) {
@@ -357,8 +362,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                     String lastKill = aggregate.getLastKillTime();
                     ArrayList<LootAggregation> aggregations = aggregate.getNpcItemAggregations();
 
-                    LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill);
-                    lootPanels.put(npcName, panelBox);
+                    if (aggregations != null) {
+                        LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill);
+                        lootPanels.put(npcName, panelBox);
+                    }
                 }
                 tripPanelBoxes.put(id, lootPanels);
             }

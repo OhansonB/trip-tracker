@@ -16,6 +16,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -62,6 +63,11 @@ public class LootDetectionTest {
         setField(plugin, "config", mockConfig);
         setField(plugin, "storageService", mock(TripStorageService.class));
         setField(plugin, "chatMessageManager", mock(net.runelite.client.chat.ChatMessageManager.class));
+
+        // Set up the debounce executor for processNewDrop
+        java.util.concurrent.ScheduledExecutorService debounceExecutor =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        setField(plugin, "debounceExecutor", debounceExecutor);
     }
 
     // === NPC Kill Tests ===
@@ -80,7 +86,7 @@ public class LootDetectionTest {
         NpcLootReceived event = new NpcLootReceived(mockNpc, items);
         plugin.onNpcLootReceived(event);
 
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(1, drops.size());
         assertEquals("Guard", drops.get(0).getDropNpcName());
         assertEquals(21, drops.get(0).getDropNpcLevel());
@@ -99,7 +105,7 @@ public class LootDetectionTest {
 
         plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, items));
 
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         TrackableItemDrop drop = drops.get(0);
         assertEquals(2, drop.getDroppedItems().size());
     }
@@ -169,7 +175,7 @@ public class LootDetectionTest {
         plugin.onItemContainerChanged(event);
 
         // Verify a drop was created
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(1, drops.size());
 
         TrackableItemDrop drop = drops.get(0);
@@ -202,7 +208,7 @@ public class LootDetectionTest {
         plugin.onItemContainerChanged(event);
 
         // No drop should be created
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(0, drops.size());
     }
 
@@ -235,7 +241,7 @@ public class LootDetectionTest {
         plugin.onItemContainerChanged(event);
 
         // The pickpocket drop should be attributed to "Guard", not "Goblin"
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(2, drops.size()); // Goblin kill + Guard pickpocket
         assertEquals("Guard", drops.get(1).getDropNpcName());
 
@@ -304,7 +310,7 @@ public class LootDetectionTest {
         }
 
         // Only 3 should remain
-        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(3, drops.size());
     }
 

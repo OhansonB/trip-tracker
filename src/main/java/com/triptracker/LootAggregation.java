@@ -9,13 +9,12 @@ public class LootAggregation implements Comparable<LootAggregation> {
     String itemName;
     long itemPrice;
     long haPrice;
-    ItemManager itemManager;
-    ItemComposition itemComposition;
 
     LootAggregation(int itemId, long quantity, ItemManager itemManager) {
         this.itemId = itemId;
-        this.itemManager = itemManager;
-        this.itemComposition = itemManager.getItemComposition(itemId);
+
+        // Look up values at construction time and store as primitives — don't retain references
+        ItemComposition itemComposition = itemManager.getItemComposition(itemId);
         this.itemPrice = itemManager.getItemPrice(itemId);
         this.itemName = itemComposition.getMembersName();
         this.haPrice = itemComposition.getHaPrice();
