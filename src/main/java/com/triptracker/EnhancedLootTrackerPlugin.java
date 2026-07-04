@@ -60,6 +60,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Inject
 	private ChatMessageManager chatMessageManager;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
+	private static final Pattern CLUE_SCROLL_PATTERN = Pattern.compile("You have completed (\\d+) ([a-z]+) Treasure Trails?\\.");
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -288,6 +289,31 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			// Use the pre-change snapshot that was captured on the last inventory change.
 			// referenceInventorySnapshot is maintained continuously in onItemContainerChanged
 			// so it always reflects the state *before* the pickpocket loot arrives.
+		}
+
+		// Check for clue scroll completion
+		final Matcher clueMatcher = CLUE_SCROLL_PATTERN.matcher(message);
+		if (clueMatcher.find()) {
+			String type = clueMatcher.group(2);
+			String eventName = "Clue Scroll (" + type.substring(0, 1).toUpperCase() + type.substring(1) + ")";
+
+			// Clue rewards use the same container as Barrows (TRAIL_REWARDINV)
+			@SuppressWarnings("deprecation")
+			int containerId = net.runelite.api.InventoryID.BARROWS_REWARD.getId();
+			final ItemContainer container = client.getItemContainer(containerId);
+			if (container != null) {
+				lastNpcKilled = eventName;
+				TrackableItemDrop clueReward = new TrackableItemDrop(eventName, 0);
+				for (Item item : container.getItems()) {
+					if (item.getId() > -1 && item.getQuantity() > 0) {
+						TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
+						clueReward.addLootToDrop(droppedItem);
+					}
+				}
+				if (!clueReward.getDroppedItems().isEmpty()) {
+					processNewDrop(clueReward);
+				}
+			}
 		}
 	}
 
