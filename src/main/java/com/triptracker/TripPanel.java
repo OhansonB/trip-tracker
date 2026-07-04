@@ -21,8 +21,12 @@ public class TripPanel {
 
     public TripPanel(Trip trip) {
         this.trip = trip;
-        statusLabel.setBorder(new EmptyBorder(5, 0, 0, 0));
+        statusLabel.setBorder(new EmptyBorder(2, 0, 0, 0));
         statusLabel.setFont(FontManager.getRunescapeSmallFont());
+        if (trip.getTripStatus()) {
+            statusLabel.setText("(active)");
+            statusLabel.setForeground(Color.GREEN);
+        }
     }
 
     public JPanel buildHeaderPanel() {
@@ -62,7 +66,17 @@ public class TripPanel {
 
         // Right-click context menu on the entire header
         headerPanel.setComponentPopupMenu(buildContextMenu());
-        headerPanel.setToolTipText("Right-click for options");
+        headerPanel.setToolTipText("Right-click for options, click to collapse");
+
+        // Left-click to collapse/expand the loot panel
+        headerPanel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getButton() == java.awt.event.MouseEvent.BUTTON1) {
+                    toggleCollapse();
+                }
+            }
+        });
+        headerPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         if (trip.getTripStatus()) {
             startStatsTimer();
@@ -90,6 +104,10 @@ public class TripPanel {
         });
         menu.add(renameItem);
 
+        JMenuItem compareItem = new JMenuItem("Compare...");
+        compareItem.addActionListener(e -> trip.getParentPlugin().showTripComparison(trip.getTripId()));
+        menu.add(compareItem);
+
         if (trip.getTripStatus()) {
             JMenuItem stopItem = new JMenuItem("Stop trip");
             stopItem.addActionListener(e -> stopTrip());
@@ -114,7 +132,7 @@ public class TripPanel {
                 trip.setStatus(false);
                 stopStatsTimer();
                 updateStats();
-                statusLabel.setText("(inactive)");
+                statusLabel.setText("");
                 trip.getParentPlugin().onTripStatusChanged();
             }
         }
@@ -135,9 +153,10 @@ public class TripPanel {
     public void setStatus(boolean status) {
         if (!status) {
             stopStatsTimer();
-            statusLabel.setText("(inactive)");
+            statusLabel.setText("");
         } else {
             statusLabel.setText("(active)");
+            statusLabel.setForeground(Color.GREEN);
         }
     }
 
@@ -177,6 +196,16 @@ public class TripPanel {
 
     public JPanel getLootPanel() {
         return lootPanel;
+    }
+
+    private void toggleCollapse() {
+        if (lootPanel.isVisible()) {
+            lootPanel.setVisible(false);
+            summaryPanelTitle.setForeground(Color.GRAY);
+        } else {
+            lootPanel.setVisible(true);
+            summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+        }
     }
 
     public Trip getTrip() {

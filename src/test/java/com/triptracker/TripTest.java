@@ -159,4 +159,48 @@ public class TripTest {
         assertTrue("Expected ~200000 gp/hr but got " + gpPerHour,
                 gpPerHour > 199000 && gpPerHour < 201000);
     }
+
+    @Test
+    public void testGpPerKillZeroWhenNoKills() {
+        assertEquals(0, trip.getGpPerKill());
+    }
+
+    @Test
+    public void testGpPerKillCalculation() {
+        trip.addValue(3000);
+        trip.incrementKills();
+        trip.incrementKills();
+        trip.incrementKills();
+        assertEquals(1000, trip.getGpPerKill());
+    }
+
+    @Test
+    public void testGpPerKillWithUnevenDivision() {
+        trip.addValue(1000);
+        trip.incrementKills();
+        trip.incrementKills();
+        trip.incrementKills();
+        // 1000 / 3 = 333 (integer division)
+        assertEquals(333, trip.getGpPerKill());
+    }
+
+    @Test
+    public void testGetDurationSecondsActiveTrip() {
+        // Trip was just created, duration should be ~0s
+        long duration = trip.getDurationSeconds();
+        assertTrue(duration >= 0 && duration < 2);
+    }
+
+    @Test
+    public void testGetDurationSecondsInactiveTrip() {
+        Mockito.when(mockPlugin.getNextTripNumber()).thenReturn(99);
+        long startTime = System.currentTimeMillis() - 60000L; // 60 seconds ago
+        long endTime = System.currentTimeMillis() - 30000L;   // ended 30 seconds ago
+        Trip stoppedTrip = new Trip("Test", mockPlugin, false,
+                startTime, "start", "end", endTime, 5, 1000, 99);
+
+        // Duration should be 30 seconds (start to end)
+        long duration = stoppedTrip.getDurationSeconds();
+        assertTrue("Expected ~30s but got " + duration, duration >= 29 && duration <= 31);
+    }
 }

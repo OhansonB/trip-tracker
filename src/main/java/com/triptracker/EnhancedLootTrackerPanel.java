@@ -446,6 +446,51 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     /**
+     * Switches the panel to show the trip comparison sub-view.
+     */
+    public void showComparisonView(int preSelectedTripId) {
+        removeAll();
+
+        TripComparisonPanel comparisonPanel = new TripComparisonPanel(
+                parentPlugin.getTrips(),
+                preSelectedTripId,
+                this::hideComparisonView
+        );
+
+        setLayout(new BorderLayout());
+        add(comparisonPanel, BorderLayout.CENTER);
+        revalidate();
+        repaint();
+    }
+
+    /**
+     * Returns from the comparison view to the normal trip panel.
+     */
+    private void hideComparisonView() {
+        removeAll();
+
+        setLayout(new BorderLayout());
+        setBorder(new EmptyBorder(6, 6, 6, 6));
+        setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+        JPanel layoutPanel = new JPanel();
+        layoutPanel.setLayout(new BoxLayout(layoutPanel, BoxLayout.Y_AXIS));
+        add(layoutPanel, BorderLayout.NORTH);
+
+        layoutPanel.add(buildTrackingModeControls());
+        layoutPanel.add(buildLootBoxPanel());
+        add(buildFooter(), BorderLayout.SOUTH);
+
+        // Switch to trip view and rebuild
+        selectedTrackingMode = 2;
+        tripModeButton.setSelected(true);
+        rebuildLootPanel();
+
+        revalidate();
+        repaint();
+    }
+
+    /**
      * Called after all data has been cleared to reset the panel state.
      */
     public void rebuildAfterClear() {

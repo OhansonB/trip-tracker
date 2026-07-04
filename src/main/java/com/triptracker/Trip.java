@@ -174,6 +174,25 @@ public class Trip {
         return (tripValue * 3600000L) / durationMs;
     }
 
+    /**
+     * Returns the trip duration in seconds.
+     */
+    public long getDurationSeconds() {
+        long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
+        return (endTime - tripStartTimeEpoch) / 1000;
+    }
+
+    /**
+     * Calculates average GP earned per kill.
+     * Returns 0 if no kills have been recorded.
+     */
+    public long getGpPerKill() {
+        if (tripKills <= 0) {
+            return 0;
+        }
+        return tripValue / tripKills;
+    }
+
     public static String formatTime(long epochMillis) {
         Date date = new Date(epochMillis);
         Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");

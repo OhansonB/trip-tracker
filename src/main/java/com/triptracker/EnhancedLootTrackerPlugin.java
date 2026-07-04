@@ -658,6 +658,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		storageService.saveTrips(trips);
 	}
 
+	public void showTripComparison(int preSelectedTripId) {
+		SwingUtilities.invokeLater(() -> panel.showComparisonView(preSelectedTripId));
+	}
+
 	/**
 	 * Clears all persisted and in-memory loot data (drops, trips, aggregates).
 	 */
