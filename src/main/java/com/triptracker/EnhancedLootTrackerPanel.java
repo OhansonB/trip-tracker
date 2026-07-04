@@ -18,8 +18,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private JPanel lootBoxPanel;
     private final int DEFAULT_TRACKING_MODE = 0;
     protected int selectedTrackingMode = DEFAULT_TRACKING_MODE;
-    private String activeTripName;
-    private boolean tripActive = false;
     private static final ImageIcon GROUPED_MODE_ICON;
     private static final ImageIcon GROUPED_MODE_ICON_HOVER;
     private static final ImageIcon GROUPED_MODE_ICON_UNSELECTED;
@@ -223,7 +221,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         lootBoxPanel.repaint();
     }
 
-    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String activeTripName) {
+    public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, String tripName) {
         String npcName = npcLootAggregate.getNpcName();
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
@@ -232,7 +230,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JPanel newLootPanel = newDropBox.buildPanelBox();
         newLootPanel.setName(npcName);
 
-        TripPanel activeTripPanel = tripsMap.get(activeTripName);
+        TripPanel activeTripPanel = tripsMap.get(tripName);
 
         if (activeTripLootPanels.containsKey(npcName)) {
             if (activeTripPanel != null) {
@@ -251,11 +249,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             activeTripLootPanels.put(npcName, newDropBox);
         }
 
-        if (tripPanelBoxes.containsKey(activeTripName)) {
-            tripPanelBoxes.remove(activeTripName);
-            tripPanelBoxes.put(activeTripName, activeTripLootPanels);
+        if (tripPanelBoxes.containsKey(tripName)) {
+            tripPanelBoxes.remove(tripName);
+            tripPanelBoxes.put(tripName, activeTripLootPanels);
         } else {
-            tripPanelBoxes.put(activeTripName, activeTripLootPanels);
+            tripPanelBoxes.put(tripName, activeTripLootPanels);
         }
 
         if (selectedTrackingMode == 2 && activeTripPanel != null) {
@@ -344,8 +342,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 parentPlugin.initTrip(tripName);
             }
 
-            toggleTripStatus(tripName);
-
             TripPanel tripPanel = new TripPanel(parentPlugin.getActiveTrip());
             tripsMap.put(tripName, tripPanel);
 
@@ -364,28 +360,19 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
             switch (selectedOption) {
                 case JOptionPane.YES_OPTION:
-                    toggleTripStatus(activeTripName);
-                    parentPlugin.getActiveTrip().setStatus(false);
-                    TripPanel activePanel = tripsMap.get(activeTripName);
+                    Trip activeTrip = parentPlugin.getActiveTrip();
+                    String activeName = activeTrip.getTripName();
+                    activeTrip.setStatus(false);
+                    TripPanel activePanel = tripsMap.get(activeName);
                     if (activePanel != null) {
                         activePanel.setStatus(false);
                     }
+                    parentPlugin.onTripStatusChanged();
                     createNewTrip();
-
                     break;
                 case JOptionPane.NO_OPTION:
                     break;
             }
-        }
-    }
-
-    private void toggleTripStatus(String tripName) {
-        if (!tripActive) {
-            tripActive = true;
-            activeTripName = tripName;
-        } else {
-            tripActive = false;
-            activeTripName = null;
         }
     }
 

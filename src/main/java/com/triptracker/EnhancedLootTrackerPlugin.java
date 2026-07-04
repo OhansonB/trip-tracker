@@ -414,65 +414,29 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	/**
-	 This method adds a given item drop to the list of NPC loot aggregates.
-	 It first retrieves the name of the NPC associated with the item drop and creates a new NPC loot aggregate.
-	 It then checks if there is an existing record for the NPC, and if not, adds the new record to the list of aggregates.
-	 If there is an existing record, it adds the item drop to the existing record.
-
-	 @param itemDrop The item drop to be added to the NPC loot aggregates.
+	 * Adds a drop to the global NPC loot aggregates. If an aggregate for the NPC already exists,
+	 * the drop is added to it and the aggregate is moved to the end of the list (most recent first).
 	 */
 	public void addDropToGroupedAggregates(TrackableItemDrop itemDrop) {
-		// Get the name of the NPC associated with the item drop.
 		String npcName = itemDrop.getDropNpcName();
 
-		// Create a new aggregate which is placed into our ArrayList<NpcLootAggregate> in the event that a new record is found
-		NpcLootAggregate tempAggregate = new NpcLootAggregate(npcName, itemManager);
-
-		// Default value of "newRecordFound = true" to be overwritten if a record is found
-		boolean newRecordFound = true;
-
-		// Integer used for our for loop and also to retrieve an existing record from the ArrayList<NpcLootAggregate>
-		// if found, so that it can be updated
-		int i = 0;
-
-		// Loop through our ArrayList<NpcLootAggregate> if it contains any elements; it will contain zero elements
-		// upon first initialisation (start up) and after the first kill will then contain data.
-		if (npcLootAggregates.size() != 0) {
-			for (i = 0; i < npcLootAggregates.size(); i++) {
-				// Get the name of the NPC associated with the NpcLootAggregate associated with the current iteration
-				// index
-				String tempName = npcLootAggregates.get(i).getNpcName();
-
-				// If the npc name associated with the existing NpcLootAggregate record matches the name of the npc
-				// that dropped the item; this means that we already have a record of all items that have dropped
-				// for this npc and are therefore only updating the existing aggregate (not creating a new one)
-				if (tempName.equals(npcName)) {
-					newRecordFound = false;
-					// exit looping
-					break;
-				}
+		NpcLootAggregate existing = null;
+		for (NpcLootAggregate agg : npcLootAggregates) {
+			if (agg.getNpcName().equals(npcName)) {
+				existing = agg;
+				break;
 			}
 		}
 
-		// If a new record has been found (i.e., we dont have an aggregate for the given npc already) then insert
-		// a new aggregate record with the drop added
-		if (newRecordFound) {
-			tempAggregate.addDropToNpcAggregate(itemDrop);
-			npcLootAggregates.add(tempAggregate);
+		if (existing == null) {
+			NpcLootAggregate newAggregate = new NpcLootAggregate(npcName, itemManager);
+			newAggregate.addDropToNpcAggregate(itemDrop);
+			npcLootAggregates.add(newAggregate);
 		} else {
-			// Add a drop to an existing record
-			npcLootAggregates.get(i).addDropToNpcAggregate(itemDrop);
-
-			// Create a copy of that record
-			NpcLootAggregate tempTempAggregate = npcLootAggregates.get(i);
-
-			// Remove the record from the ArrayList
-			npcLootAggregates.remove(i);
-
-			// Add the copy back to the ArrayList
-			// This is required to float the record to the top of the list so that when grouped view rebuilds it
-			// does so no the correct order
-			npcLootAggregates.add(tempTempAggregate);
+			existing.addDropToNpcAggregate(itemDrop);
+			// Move to end so most-recently-updated NPCs appear first when list is iterated in reverse
+			npcLootAggregates.remove(existing);
+			npcLootAggregates.add(existing);
 		}
 
 		getItemAggregations(npcName);

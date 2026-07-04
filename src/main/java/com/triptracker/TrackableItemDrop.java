@@ -1,9 +1,5 @@
 package com.triptracker;
 
-import net.runelite.api.ChatMessageType;
-import net.runelite.client.chat.ChatMessageManager;
-import net.runelite.client.chat.QueuedMessage;
-
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -44,29 +40,6 @@ public class TrackableItemDrop {
         droppedItems.add(itemToAdd);
         totalDropGeValue += itemToAdd.getTotalGePrice();
         totalDropHaValue += itemToAdd.getTotalHaPrice();
-    }
-
-    String describeTrackableDrop(ChatMessageManager chatMessageManager, EnhancedLootTrackerConfig pluginConfig) {
-        StringBuilder dropDescription = new StringBuilder();
-        dropDescription.append("Drop with value ").append(totalDropGeValue).append(" gp ");
-        dropDescription.append("received at ").append(getDateFromLong(dropTimeDate)).append(" ");
-        dropDescription.append("from ").append(npcName).append(" ");
-
-        if (pluginConfig.showLootInChat()) {
-            chatMessageManager.queue(QueuedMessage.builder()
-                    .type(ChatMessageType.GAMEMESSAGE)
-                    .runeLiteFormattedMessage(dropDescription.toString())
-                    .build());
-        }
-
-        dropDescription.append("with combat level ").append(npcCombatLevel).append(". ");
-        dropDescription.append("Items dropped: \r\n");
-
-        for (final TrackableDroppedItem item: droppedItems) {
-            dropDescription.append(item.describeTrackableDroppedItem()).append("\r\n");
-        }
-
-        return dropDescription.toString();
     }
 
     String getDateFromLong(long EpochTimeMillis) {

@@ -53,7 +53,7 @@ public class LootTrackingPanelBox extends JPanel {
         switch (boxType) {
             case 0:
                 summaryPanelTitle.setText(itemDrop.getDropNpcName() + " (lvl " + itemDrop.getDropNpcLevel() + ")");
-                dropValueLabel.setText(shortenNumber(itemDrop.getTotalDropGeValue()) + " gp");
+                dropValueLabel.setText(FormatUtil.shortenNumber(itemDrop.getTotalDropGeValue()) + " gp");
                 dropTimeDateLabel.setText(itemDrop.getDateFromLong(itemDrop.getDropTimeDate()));
 
                 ArrayList<TrackableDroppedItem> droppedItems = itemDrop.getDroppedItems();
@@ -64,7 +64,7 @@ public class LootTrackingPanelBox extends JPanel {
                     gbc.anchor = GridBagConstraints.LINE_START;
 
                     JLabel droppedItemNameLabel = new JLabel();
-                    droppedItemNameLabel.setText(item.getItemName() + " x" + shortenNumber(item.getQuantity()));
+                    droppedItemNameLabel.setText(item.getItemName() + " x" + FormatUtil.shortenNumber(item.getQuantity()));
                     droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -74,7 +74,7 @@ public class LootTrackingPanelBox extends JPanel {
                     gbc.anchor = GridBagConstraints.LINE_END;
 
                     JLabel droppedItemValueLabel = new JLabel();
-                    droppedItemValueLabel.setText(shortenNumber(item.getTotalGePrice()) + " gp");
+                    droppedItemValueLabel.setText(FormatUtil.shortenNumber(item.getTotalGePrice()) + " gp");
                     droppedItemValueLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemValueLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemValueLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -86,7 +86,7 @@ public class LootTrackingPanelBox extends JPanel {
                 break;
             case 1:
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
-                dropValueLabel.setText(shortenNumber(totalGeValue) + " gp");
+                dropValueLabel.setText(FormatUtil.shortenNumber(totalGeValue) + " gp");
                 dropTimeDateLabel.setText("Last kill at: " + lastKillTimeFormatted);
 
                 Collections.sort(lootAggregations);
@@ -99,7 +99,7 @@ public class LootTrackingPanelBox extends JPanel {
                     long itemQuantity = lootAggregation.getQuantity();
                     long totalValue = lootAggregation.getTotalGePrice();
 
-                    JLabel droppedItemNameLabel = new JLabel(itemName + " x" + shortenNumber(itemQuantity));
+                    JLabel droppedItemNameLabel = new JLabel(itemName + " x" + FormatUtil.shortenNumber(itemQuantity));
                     droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemNameLabel.setForeground(Color.LIGHT_GRAY);
                     droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -109,7 +109,7 @@ public class LootTrackingPanelBox extends JPanel {
                     gbc.anchor = GridBagConstraints.LINE_END;
 
 
-                    JLabel droppedItemValue = new JLabel(shortenNumber(totalValue) + " gp", SwingConstants.RIGHT);
+                    JLabel droppedItemValue = new JLabel(FormatUtil.shortenNumber(totalValue) + " gp", SwingConstants.RIGHT);
                     droppedItemValue.setFont(FontManager.getRunescapeSmallFont());
                     droppedItemValue.setForeground(Color.LIGHT_GRAY);
                     droppedItemValue.setBorder(new EmptyBorder(2, 5, 4, 5));
@@ -173,10 +173,6 @@ public class LootTrackingPanelBox extends JPanel {
         dropDetailPanel.add(droppedItemsPanel, BorderLayout.SOUTH);
 
         return outerPanel;
-    }
-
-    public String shortenNumber(long numberToShorten) {
-        return FormatUtil.shortenNumber(numberToShorten);
     }
 
     private void toggleCollapse() {

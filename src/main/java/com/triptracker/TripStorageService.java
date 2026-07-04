@@ -34,8 +34,12 @@ public class TripStorageService {
     private final ExecutorService writeExecutor;
 
     public TripStorageService() {
+        this(new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME));
+    }
+
+    public TripStorageService(File pluginDir) {
         this.gson = new GsonBuilder().setPrettyPrinting().create();
-        this.pluginDir = new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME);
+        this.pluginDir = pluginDir;
         this.writeExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "trip-tracker-persistence");
             t.setDaemon(true);
