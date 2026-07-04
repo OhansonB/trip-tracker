@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
@@ -44,8 +43,6 @@ import java.util.stream.Collectors;
 
 public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Inject
-	private ChatMessageManager chatMessageManager;
-	@Inject
 	private EnhancedLootTrackerConfig config;
 	@Inject
 	private Client client;
@@ -56,10 +53,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Inject
 	private net.runelite.client.callback.ClientThread clientThread;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
-	private static final Multimap<String, String> PICKPOCKET_DISAMBIGUATION_MAP = ImmutableMultimap.of(
-			"H.A.M. Member", "Man",
-			"H.A.M. Member", "Woman"
-	);
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -105,9 +98,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private String lastNpcKilled;
 	private final ArrayList<NpcLootAggregate> npcLootAggregates = new ArrayList<>();
 	private final ArrayList<Trip> trips = new ArrayList<>();
-	public boolean activeTripExists = false;
-	public String activeTripName = null;
-	private static int numberOfTrips = 0;
+	private int numberOfTrips = 0;
 	private boolean pickpocketHasOccurred;
 	private TripStorageService storageService;
 
@@ -165,7 +156,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				record.tripActive = false;
 				if (record.tripEndTime == null || "n/a".equals(record.tripEndTime)) {
 					long endEpoch = System.currentTimeMillis();
-					record.tripEndTime = Trip.formatTimePublic(endEpoch);
+					record.tripEndTime = Trip.formatTime(endEpoch);
 					record.tripEndTimeEpoch = endEpoch;
 				}
 			}
@@ -509,21 +500,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public boolean checkForActiveTrip() {
-		// Set a flag for whether there is currently an active trip
-		boolean isActiveTrip = false;
-
-		// Loop through all trips
 		for (Trip trip : trips) {
-
-			// If a trip has tripActive == true
 			if (trip.getTripStatus()) {
-				isActiveTrip = true;
-				break;
+				return true;
 			}
 		}
-
-		activeTripExists = isActiveTrip;
-		return isActiveTrip;
+		return false;
 	}
 
 	public void initTrip(String tripName) {
@@ -533,7 +515,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		trips.add(new Trip(tripName, this));
 		numberOfTrips++;
-		activeTripName = tripName;
 
 		// Persist trip state change
 		storageService.saveTrips(trips);
@@ -546,6 +527,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public void getItemAggregations(String npcName) {
+		if (!log.isDebugEnabled()) {
+			return;
+		}
+
 		ArrayList<LootAggregation> lootAggregation = null;
 
 		for (NpcLootAggregate npcAggregate : npcLootAggregates) {
@@ -566,7 +551,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 			log.debug("All kills of {} are worth {}gp.", npcName, totalGeValue);
 		}
-
 	}
 
 	public NpcLootAggregate getNpcAggregate(String npcName) {

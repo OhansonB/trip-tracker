@@ -150,13 +150,9 @@ public class Trip {
         return result.toString().trim();
     }
 
-    private static String formatTime(long epochMillis) {
+    public static String formatTime(long epochMillis) {
         Date date = new Date(epochMillis);
         Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
         return format.format(date);
-    }
-
-    public static String formatTimePublic(long epochMillis) {
-        return formatTime(epochMillis);
     }
 }
