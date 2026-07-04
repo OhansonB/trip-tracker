@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
@@ -52,6 +54,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private ClientToolbar clientToolbar;
 	@Inject
 	private net.runelite.client.callback.ClientThread clientThread;
+	@Inject
+	private ChatMessageManager chatMessageManager;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
@@ -105,6 +109,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(EnhancedLootTrackerConfig.class);
+	}
+
+	@Subscribe
+	public void onConfigChanged(net.runelite.client.events.ConfigChanged event) {
+		// Reserved for future config reactions
 	}
 
 	@Override
@@ -328,22 +337,72 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void processNewDrop(TrackableItemDrop newItemDrop) {
 		updateItemMaps(newItemDrop);
 
-		TrackingMode trackingMode = TrackingMode.fromId(panel.getSelectedTrackingMode());
-		switch (trackingMode) {
-			case LIST:
-				updateListViewUi(newItemDrop);
-				updateGroupedViewUI();
-				updateCurrentTripUi();
-				break;
+		// Send loot summary to chat if configured
+		if (config.showLootInChat()) {
+			String message = newItemDrop.getDropNpcName() + " drop: " +
+					FormatUtil.shortenNumber(newItemDrop.getTotalDropGeValue()) + " gp";
+			chatMessageManager.queue(QueuedMessage.builder()
+					.type(ChatMessageType.GAMEMESSAGE)
+					.runeLiteFormattedMessage(message)
+					.build());
+		}
 
-			case GROUPED:
-			case TRIP:
-				updateGroupedViewUI();
-				updateCurrentTripUi();
-				break;
+		// Trim if over limit
+		int maxDrops = config.maxDrops();
+		boolean trimmed = false;
+		while (listViewDropArray.size() > maxDrops) {
+			listViewDropArray.remove(0);
+			trimmed = true;
+		}
 
-			default:
-				break;
+		int maxTrips = config.maxTrips();
+		while (trips.size() > maxTrips) {
+			trips.remove(0);
+		}
+
+		// If trimmed, rebuild aggregates from scratch and refresh UI
+		if (trimmed) {
+			npcLootAggregates.clear();
+			for (TrackableItemDrop drop : listViewDropArray) {
+				String npcName = drop.getDropNpcName();
+				NpcLootAggregate existing = null;
+				for (NpcLootAggregate agg : npcLootAggregates) {
+					if (agg.getNpcName().equals(npcName)) {
+						existing = agg;
+						break;
+					}
+				}
+				if (existing == null) {
+					NpcLootAggregate newAgg = new NpcLootAggregate(npcName, itemManager);
+					newAgg.addDropToNpcAggregate(drop);
+					npcLootAggregates.add(newAgg);
+				} else {
+					existing.addDropToNpcAggregate(drop);
+					npcLootAggregates.remove(existing);
+					npcLootAggregates.add(existing);
+				}
+			}
+
+			SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+		} else {
+			// Normal UI update (no trimming needed)
+			TrackingMode trackingMode = TrackingMode.fromId(panel.getSelectedTrackingMode());
+			switch (trackingMode) {
+				case LIST:
+					updateListViewUi(newItemDrop);
+					updateGroupedViewUI();
+					updateCurrentTripUi();
+					break;
+
+				case GROUPED:
+				case TRIP:
+					updateGroupedViewUI();
+					updateCurrentTripUi();
+					break;
+
+				default:
+					break;
+			}
 		}
 
 		// Persist after every drop (async, non-blocking)
@@ -603,5 +662,20 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public void onTripStatusChanged() {
 		storageService.saveTrips(trips);
+	}
+
+	/**
+	 * Clears all persisted and in-memory loot data (drops, trips, aggregates).
+	 */
+	public void clearAllData() {
+		listViewDropArray.clear();
+		npcLootAggregates.clear();
+		trips.clear();
+		numberOfTrips = 0;
+
+		storageService.saveDrops(listViewDropArray);
+		storageService.saveTrips(trips);
+
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterClear());
 	}
 }

@@ -73,6 +73,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         layoutPanel.add(buildTrackingModeControls());
         layoutPanel.add(buildLootBoxPanel());
+
+        // Footer with clear button
+        add(buildFooter(), BorderLayout.SOUTH);
     }
 
     private JPanel buildTrackingModeControls() {
@@ -369,8 +372,47 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         }
     }
 
+    private JPanel buildFooter() {
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        footer.setBorder(new EmptyBorder(10, 0, 0, 0));
+
+        JButton clearButton = new JButton("Clear all data");
+        clearButton.setFont(FontManager.getRunescapeSmallFont());
+        clearButton.setForeground(Color.GRAY);
+        clearButton.setToolTipText("Delete all tracked drops and trips");
+        clearButton.addActionListener(e -> confirmClearAllData());
+        footer.add(clearButton, BorderLayout.CENTER);
+
+        return footer;
+    }
+
     public void removeTrip(String tripName) {
         tripsMap.remove(tripName);
+        tripPanelBoxes.remove(tripName);
+        rebuildLootPanel();
+    }
+
+    private void confirmClearAllData() {
+        int selectedOption = JOptionPane.showConfirmDialog(null,
+                "This will permanently delete all tracked drops and trips. Are you sure?",
+                "Clear All Data",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (selectedOption == JOptionPane.YES_OPTION) {
+            parentPlugin.clearAllData();
+        }
+    }
+
+    /**
+     * Called after all data has been cleared to reset the panel state.
+     */
+    public void rebuildAfterClear() {
+        tripsMap.clear();
+        tripPanelBoxes.clear();
+        groupedLootBoxPanels.clear();
+        activeTripLootPanels.clear();
         rebuildLootPanel();
     }
 }

@@ -3,8 +3,9 @@ package com.triptracker;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
-@ConfigGroup("example")
+@ConfigGroup("triptracker")
 public interface EnhancedLootTrackerConfig extends Config {
 	@ConfigItem(
 			position = 1,
@@ -15,5 +16,29 @@ public interface EnhancedLootTrackerConfig extends Config {
 	default boolean showLootInChat()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+			position = 2,
+			keyName = "maxDrops",
+			name = "Max drops to keep",
+			description = "Maximum number of individual drop events to persist (oldest are removed first)"
+	)
+	@Range(min = 10, max = 10000)
+	default int maxDrops()
+	{
+		return 5000;
+	}
+
+	@ConfigItem(
+			position = 3,
+			keyName = "maxTrips",
+			name = "Max trips to keep",
+			description = "Maximum number of trips to persist (oldest are removed first)"
+	)
+	@Range(min = 5, max = 200)
+	default int maxTrips()
+	{
+		return 50;
 	}
 }

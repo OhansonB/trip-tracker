@@ -50,11 +50,18 @@ public class LootDetectionTest {
         // Set up panel mock
         when(mockPanel.getSelectedTrackingMode()).thenReturn(0);
 
+        // Set up config mock
+        EnhancedLootTrackerConfig mockConfig = mock(EnhancedLootTrackerConfig.class);
+        when(mockConfig.maxDrops()).thenReturn(500);
+        when(mockConfig.maxTrips()).thenReturn(50);
+
         // Inject mocks via reflection
         setField(plugin, "client", mockClient);
         setField(plugin, "itemManager", mockItemManager);
         setField(plugin, "panel", mockPanel);
+        setField(plugin, "config", mockConfig);
         setField(plugin, "storageService", mock(TripStorageService.class));
+        setField(plugin, "chatMessageManager", mock(net.runelite.client.chat.ChatMessageManager.class));
     }
 
     // === NPC Kill Tests ===
@@ -277,6 +284,70 @@ public class LootDetectionTest {
         Multiset<Integer> snapshot = (Multiset<Integer>) getField(plugin, "referenceInventorySnapshot");
         assertNotNull(snapshot);
         assertEquals(50, snapshot.count(995));
+    }
+
+    // === Retention and Clear Tests ===
+
+    @Test
+    public void testDropsAreTrimmedWhenOverLimit() throws Exception {
+        // Set max drops to 3
+        EnhancedLootTrackerConfig mockConfig = (EnhancedLootTrackerConfig) getField(plugin, "config");
+        when(mockConfig.maxDrops()).thenReturn(3);
+
+        NPC mockNpc = mock(NPC.class);
+        when(mockNpc.getName()).thenReturn("Man");
+        when(mockNpc.getCombatLevel()).thenReturn(2);
+
+        // Add 5 drops
+        for (int i = 0; i < 5; i++) {
+            plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        }
+
+        // Only 3 should remain
+        ArrayList<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        assertEquals(3, drops.size());
+    }
+
+    @Test
+    public void testAggregatesRebuiltAfterTrim() throws Exception {
+        // Set max drops to 2
+        EnhancedLootTrackerConfig mockConfig = (EnhancedLootTrackerConfig) getField(plugin, "config");
+        when(mockConfig.maxDrops()).thenReturn(2);
+
+        NPC mockNpc = mock(NPC.class);
+        when(mockNpc.getName()).thenReturn("Guard");
+        when(mockNpc.getCombatLevel()).thenReturn(21);
+
+        // Add 4 drops (will trim to 2)
+        for (int i = 0; i < 4; i++) {
+            plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        }
+
+        // Aggregate should reflect only 2 kills (the retained ones)
+        NpcLootAggregate aggregate = plugin.getNpcAggregate("Guard");
+        assertNotNull(aggregate);
+        assertEquals(2, aggregate.getNumberOfKills());
+    }
+
+    @Test
+    public void testClearAllDataEmptiesEverything() throws Exception {
+        NPC mockNpc = mock(NPC.class);
+        when(mockNpc.getName()).thenReturn("Goblin");
+        when(mockNpc.getCombatLevel()).thenReturn(5);
+
+        // Add some drops
+        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(995, 10))));
+
+        assertEquals(2, plugin.getListViewDropArray().size());
+        assertNotNull(plugin.getNpcAggregate("Goblin"));
+
+        // Clear
+        plugin.clearAllData();
+
+        assertEquals(0, plugin.getListViewDropArray().size());
+        assertNull(plugin.getNpcAggregate("Goblin"));
+        assertEquals(0, plugin.getTrips().size());
     }
 
     // === Helper Methods ===
