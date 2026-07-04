@@ -49,6 +49,8 @@ Accessed via right-click → "Details" on a trip header.
 
 ### 12. Export pretty print for e.g., Discord
 
+### 13. Character-specific tracking
+
 ## Priority Suggestion
 
 | # | Feature | Impact | Effort | Suggested Order |
