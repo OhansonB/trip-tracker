@@ -295,16 +295,16 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void processNewDrop(TrackableItemDrop newItemDrop) {
 		updateItemMaps(newItemDrop);
 
-		int trackingMode = panel.getSelectedTrackingMode();
+		TrackingMode trackingMode = TrackingMode.fromId(panel.getSelectedTrackingMode());
 		switch (trackingMode) {
-			case 0:
+			case LIST:
 				updateListViewUi(newItemDrop);
 				updateGroupedViewUI();
 				updateCurrentTripUi();
 				break;
 
-			case 1:
-			case 2:
+			case GROUPED:
+			case TRIP:
 				updateGroupedViewUI();
 				updateCurrentTripUi();
 				break;
@@ -322,7 +322,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void updateCurrentTripUi() {
 		if (getActiveTrip() != null) {
 			Trip aTrip = getActiveTrip();
-			aTrip.tripKills++;
+			aTrip.incrementKills();
 
 			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
 
@@ -355,7 +355,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (getActiveTrip() != null) {
 			Trip trip = getActiveTrip();
-			trip.tripValue += itemDrop.getTotalDropGeValue();
+			trip.addValue(itemDrop.getTotalDropGeValue());
 
 			String npcName = itemDrop.getDropNpcName();
 			boolean newAggregateRequired = true;
@@ -543,30 +543,25 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public void rebuildLootPanel() {
-		switch (panel.getSelectedTrackingMode()) {
-			// Case 0 = list view mode
-			case 0:
+		TrackingMode mode = TrackingMode.fromId(panel.getSelectedTrackingMode());
+		switch (mode) {
+			case LIST:
 				for (TrackableItemDrop itemDrop : getListViewDropArray()) {
 					panel.addLootBox(itemDrop);
 				}
-
 				break;
-			// Case 1 = aggregated by npc name (grouped mode)
-			case 1:
+
+			case GROUPED:
 				for (NpcLootAggregate npcAggregate : npcLootAggregates) {
-					// Get the name of the npc associated with the current npc loot aggregate
 					String npcName = npcAggregate.getNpcName();
-
-					// Get the npc's item aggregation
 					ArrayList<LootAggregation> npcsLootAggregation = getAggregation(npcName);
-
-					// Add loot box for the item aggregation
 					SwingUtilities.invokeLater(() -> panel.addLootBox(getNpcAggregate(npcName), npcsLootAggregation));
 				}
 				break;
-			case 2:
 
+			case TRIP:
 				break;
+
 			default:
 				log.warn("Unsupported view mode: {}", panel.getSelectedTrackingMode());
 				break;
@@ -586,6 +581,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			if (trips.get(i).getTripName().equals(tripName)) {
 				trips.remove(i);
 				panel.removeTrip(tripName);
+				break;
 			}
 		}
 	}

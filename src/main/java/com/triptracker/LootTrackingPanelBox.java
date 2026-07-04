@@ -8,7 +8,6 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.text.DecimalFormat;
 import java.util.*;
 
 public class LootTrackingPanelBox extends JPanel {
@@ -177,22 +176,7 @@ public class LootTrackingPanelBox extends JPanel {
     }
 
     public String shortenNumber(long numberToShorten) {
-        String shortenedNumber = String.valueOf(numberToShorten);
-
-        if (numberToShorten >= 10000 && numberToShorten <= 999999) {
-            DecimalFormat df = new DecimalFormat("#.#");
-            shortenedNumber = df.format(numberToShorten / 1000.0) + "k";
-            
-        } else if (numberToShorten >= 1000000 && numberToShorten <= 999999999) {
-            DecimalFormat df = new DecimalFormat("#.##");
-            shortenedNumber = df.format(numberToShorten / 1000000.00) + "m";
-
-        } else if (numberToShorten >= 1000000000) {
-            DecimalFormat df = new DecimalFormat("#.###");
-            shortenedNumber = df.format(numberToShorten / 1000000000.000) + "b";
-        }
-
-        return shortenedNumber;
+        return FormatUtil.shortenNumber(numberToShorten);
     }
 
     private void toggleCollapse() {
