@@ -62,6 +62,26 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
 	private static final Pattern CLUE_SCROLL_PATTERN = Pattern.compile("You have completed (\\d+) ([a-z]+) Treasure Trails?\\.");
 
+	// Chat-triggered loot sources
+	private static final String WINTERTODT_LOOT_PREFIX = "You found some loot: ";
+	private static final String TEMPOROSS_LOOT_PREFIX = "You found some loot: ";
+	private static final String GUARDIANS_OF_THE_RIFT_LOOT_PREFIX = "You found some loot: ";
+	private static final String HERBIBOAR_MESSAGE = "You harvest herbs from the herbiboar, whereupon it escapes.";
+	private static final String CHEST_LOOTED_MESSAGE = "You find some treasure in the chest!";
+	private static final String OTHER_CHEST_LOOTED_MESSAGE = "You steal some loot from the chest.";
+	private static final Pattern LARRAN_CHEST_PATTERN = Pattern.compile("You have opened Larran's (big|small) chest .*");
+	private static final Pattern BIRDHOUSE_PATTERN = Pattern.compile("You dismantle and discard the trap, retrieving .*");
+
+	// Region IDs for location-specific loot
+	private static final int WINTERTODT_REGION = 6461;
+	private static final int TEMPOROSS_REGION = 12588;
+	private static final int GUARDIANS_OF_THE_RIFT_REGION = 14484;
+
+	// Flag for inventory-diff based loot detection
+	private boolean awaitingLootDiff;
+	private String pendingLootEventName;
+	private Multiset<Integer> preLootInventorySnapshot;
+
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
 			22521, 22522, 22523, 22524, 22525, 22526, 22527, 22528, 22529, 22530,
@@ -315,6 +335,36 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			}
 		}
+
+		// Chat-triggered inventory-diff loot sources
+		final int regionId = client.getLocalPlayer() != null
+				? client.getLocalPlayer().getWorldLocation().getRegionID() : -1;
+
+		if (regionId == WINTERTODT_REGION && message.contains(WINTERTODT_LOOT_PREFIX)) {
+			triggerLootDiff("Wintertodt");
+		} else if (regionId == TEMPOROSS_REGION && message.contains(TEMPOROSS_LOOT_PREFIX)) {
+			triggerLootDiff("Tempoross");
+		} else if (regionId == GUARDIANS_OF_THE_RIFT_REGION && message.contains(GUARDIANS_OF_THE_RIFT_LOOT_PREFIX)) {
+			triggerLootDiff("Guardians of the Rift");
+		} else if (message.equals(HERBIBOAR_MESSAGE)) {
+			triggerLootDiff("Herbiboar");
+		} else if (message.equals(CHEST_LOOTED_MESSAGE) || message.equals(OTHER_CHEST_LOOTED_MESSAGE)) {
+			triggerLootDiff("Chest");
+		} else if (LARRAN_CHEST_PATTERN.matcher(message).matches()) {
+			triggerLootDiff("Larran's Chest");
+		} else if (BIRDHOUSE_PATTERN.matcher(message).matches()) {
+			triggerLootDiff("Bird House");
+		}
+	}
+
+	/**
+	 * Triggers an inventory diff for chat-based loot sources.
+	 * Takes a snapshot now; the diff is processed on the next ItemContainerChanged.
+	 */
+	private void triggerLootDiff(String eventName) {
+		awaitingLootDiff = true;
+		pendingLootEventName = eventName;
+		preLootInventorySnapshot = getPlayerInventorySnapshot();
 	}
 
 	private static final int INVENTORY_CONTAINER_ID = 93; // Standard player inventory container ID
@@ -400,6 +450,33 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 				// Process TrackableItemDrop (add to UI elements and such)
 				processNewDrop(itemDrop);
+			} else if (awaitingLootDiff) {
+				// Process chat-triggered loot diff
+				awaitingLootDiff = false;
+
+				Multiset<Integer> currentInventory = getPlayerInventorySnapshot();
+				Multiset<Integer> newItems = compareInventorySnapshot(currentInventory, preLootInventorySnapshot);
+
+				if (!newItems.isEmpty()) {
+					lastNpcKilled = pendingLootEventName;
+					TrackableItemDrop lootDrop = new TrackableItemDrop(pendingLootEventName, 0);
+
+					for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
+						int itemId = entry.getElement();
+						int quantity = entry.getCount();
+						if (itemId > -1 && quantity > 0) {
+							TrackableDroppedItem droppedItem = buildTrackableItem(itemId, quantity);
+							lootDrop.addLootToDrop(droppedItem);
+						}
+					}
+
+					if (!lootDrop.getDroppedItems().isEmpty()) {
+						processNewDrop(lootDrop);
+					}
+				}
+
+				// Also maintain reference snapshot
+				referenceInventorySnapshot = currentInventory;
 			} else {
 				// No pickpocket in progress — maintain the reference snapshot so we always
 				// have a clean "before" state when a pickpocket does occur
