@@ -123,7 +123,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		System.out.println("EnhancedLootTrackerPlugin.onChatMessage");
 		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
 		{
 			return;
@@ -138,9 +137,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 			// Get the target's name as listed in the chat box
 			String pickpocketTarget = WordUtils.capitalize(pickpocketMatcher.group("target"));
+
 			lastPickpocketTarget = pickpocketTarget;
 
-			referenceInventorySnapshot = getPlayerInventorySnapshot();
+			// Use the pre-change snapshot that was captured on the last inventory change.
+			// referenceInventorySnapshot is maintained continuously in onItemContainerChanged
+			// so it always reflects the state *before* the pickpocket loot arrives.
 		}
 	}
 
@@ -170,8 +172,22 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				// Get a snapshot of the players inventory (after the change)
 				inventorySnapshot = getPlayerInventorySnapshot();
 
+				// If we don't have a reference snapshot yet, skip processing
+				if (referenceInventorySnapshot == null) {
+					referenceInventorySnapshot = inventorySnapshot;
+					return;
+				}
+
 				// Create a difference between the post-change and pre-change inventory
 				Multiset<Integer> newItems = compareInventorySnapshot(inventorySnapshot, referenceInventorySnapshot);
+
+				// Update the reference snapshot for next time
+				referenceInventorySnapshot = inventorySnapshot;
+
+				// If there's no difference (e.g., pickpocket was interrupted), skip processing
+				if (newItems.isEmpty()) {
+					return;
+				}
 
 				// Generate a RuneLite List<ItemStack> object from the difference between current and reference
 				// inventory snapshots
@@ -192,8 +208,15 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					itemDrop.addLootToDrop(newDroppedItem);
 				}
 
+				// Set lastNpcKilled so trip/grouped views attribute loot to the correct target
+				lastNpcKilled = lastPickpocketTarget;
+
 				// Process TrackableItemDrop (add to UI elements and such)
 				processNewDrop(itemDrop);
+			} else {
+				// No pickpocket in progress — maintain the reference snapshot so we always
+				// have a clean "before" state when a pickpocket does occur
+				referenceInventorySnapshot = getPlayerInventorySnapshot();
 			}
 		}
 	}

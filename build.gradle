@@ -2,6 +2,12 @@ plugins {
 	id 'java'
 }
 
+task run(type: JavaExec) {
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.triptracker.EnhancedLootTrackerTest'
+	jvmArgs = ['-ea', '-Xmx1g', '-Xss2m']
+}
+
 repositories {
 	mavenLocal()
 	maven {
@@ -25,9 +31,9 @@ dependencies {
 
 group = 'com.example'
 version = '1.0-SNAPSHOT'
-sourceCompatibility = "15"
+sourceCompatibility = "11"
 
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
 }
-targetCompatibility = JavaVersion.VERSION_15
+targetCompatibility = JavaVersion.VERSION_11

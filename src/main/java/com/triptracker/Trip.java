@@ -284,19 +284,9 @@ public class Trip {
 
     public void updateTooltipText() {
         if (tripActive) {
-            tooltipText = String.format("""
-            <html>
-            Trip started: %s
-            <br>
-            Trip ended: %s
-            <br>
-            Trip duration: %s
-            <br>
-            Trip kills: %s
-            <br>
-            Trip value: %s gp
-            </html>
-            """, tripStartTime, tripEndTime, calculateTripDuration(), tripKills, shortenNumber(tripValue));
+            tooltipText = String.format(
+                "<html>Trip started: %s<br>Trip ended: %s<br>Trip duration: %s<br>Trip kills: %s<br>Trip value: %s gp</html>",
+                tripStartTime, tripEndTime, calculateTripDuration(), tripKills, shortenNumber(tripValue));
         }
 
         tripInfoButton.setToolTipText(tooltipText);
