@@ -7,23 +7,19 @@ import com.google.common.collect.*;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
-import net.runelite.client.game.LootManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.loottracker.LootTrackerPlugin;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.game.ItemManager;
-import net.runelite.http.api.loottracker.LootRecordType;
 import org.apache.commons.text.WordUtils;
 
 import java.awt.image.BufferedImage;
@@ -55,8 +51,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private Client client;
 	@Inject
 	private ItemManager itemManager;
-	@Inject
-	private LootManager lootManager;
 	@Inject
 	private ClientToolbar clientToolbar;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
@@ -103,7 +97,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		PICKPOCKET_COIN_VALUES.put("TzHaar-Hur", 80);
 	}
 	private String lastPickpocketTarget;
-	private InventoryID inventoryId;
 	private Multiset<Integer> inventorySnapshot;
 	private Multiset<Integer> referenceInventorySnapshot;
 	private EnhancedLootTrackerPanel panel;
@@ -188,9 +181,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 	}
 
+	private static final int INVENTORY_CONTAINER_ID = 93; // Standard player inventory container ID
+
 	private Multiset<Integer> getPlayerInventorySnapshot() {
 		Multiset<Integer> multiset = HashMultiset.create();
-		final ItemContainer itemContainer = client.getItemContainer(InventoryID.INVENTORY);
+		final ItemContainer itemContainer = client.getItemContainer(INVENTORY_CONTAINER_ID);
 		if (itemContainer != null)
 		{
 			Arrays.stream(itemContainer.getItems())
@@ -203,7 +198,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
 		// If the change has occurred in the player's inventory
-		if (event.getContainerId() == InventoryID.INVENTORY.getId()) {
+		if (event.getContainerId() == INVENTORY_CONTAINER_ID) {
 
 			// pickpocketHasOccurred is set to true as a result of a certain chat message being detected
 			// in onChatMessage
@@ -234,7 +229,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				// Generate a RuneLite List<ItemStack> object from the difference between current and reference
 				// inventory snapshots
 				final List<ItemStack> itemStacks = newItems.entrySet().stream()
-						.map(e -> new ItemStack(e.getElement(), e.getCount(), client.getLocalPlayer().getLocalLocation()))
+						.map(e -> new ItemStack(e.getElement(), e.getCount()))
 						.collect(Collectors.toList());
 
 				// Create a new itemDrop object
@@ -349,7 +344,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					panel.addLootBox(npcLootAggregate, lootAggregation, aTrip.getTripName())
 			);
 		} else {
-			System.out.println("getActiveTrip() is null");
+			log.debug("getActiveTrip() is null");
 		}
 	}
 
@@ -461,7 +456,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// If no active trip has been found
 		if (activeTrip == null) {
-			System.out.println("There is not an active trip");
+			log.debug("There is not an active trip");
 		}
 
 		return activeTrip;
@@ -513,17 +508,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (lootAggregation != null) {
 			long totalGeValue = 0;
 			for (LootAggregation itemStack : lootAggregation) {
-				String line = "ItemId " + itemStack.getItemId() +
-						" is called " + itemStack.getItemName() +
-						" and has quantity " + itemStack.getQuantity() +
-						" with value " + itemStack.getTotalGePrice();
-
-				System.out.println(line);
+				log.debug("ItemId {} is called {} and has quantity {} with value {}",
+						itemStack.getItemId(), itemStack.getItemName(),
+						itemStack.getQuantity(), itemStack.getTotalGePrice());
 
 				totalGeValue += itemStack.getTotalGePrice();
 			}
 
-			System.out.println("All kills of " + npcName + " are worth " + totalGeValue + "gp.\n");
+			log.debug("All kills of {} are worth {}gp.", npcName, totalGeValue);
 		}
 
 	}
@@ -576,7 +568,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 				break;
 			default:
-				System.out.println("You have tried to switch to a view mode that is not supported");
+				log.warn("Unsupported view mode: {}", panel.getSelectedTrackingMode());
 				break;
 		}
 	}

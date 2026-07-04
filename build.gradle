@@ -2,12 +2,6 @@ plugins {
 	id 'java'
 }
 
-task run(type: JavaExec) {
-	classpath = sourceSets.test.runtimeClasspath
-	mainClass = 'com.triptracker.EnhancedLootTrackerTest'
-	jvmArgs = ['-ea', '-Xmx1g', '-Xss2m']
-}
-
 repositories {
 	mavenLocal()
 	maven {
@@ -19,21 +13,28 @@ repositories {
 def runeLiteVersion = 'latest.release'
 
 dependencies {
-    compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
+	compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
 
 	compileOnly 'org.projectlombok:lombok:1.18.20'
 	annotationProcessor 'org.projectlombok:lombok:1.18.20'
 
 	testImplementation 'junit:junit:4.12'
-	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
-	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
+	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+	testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
 }
 
-group = 'com.example'
-version = '1.0-SNAPSHOT'
-sourceCompatibility = "11"
+group = 'com.triptracker'
+version = '1.0.0'
+sourceCompatibility = '11'
+targetCompatibility = '11'
 
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
+	options.compilerArgs << '-Xlint:deprecation'
 }
-targetCompatibility = JavaVersion.VERSION_11
+
+task run(type: JavaExec) {
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.triptracker.EnhancedLootTrackerTest'
+	jvmArgs = ['-ea', '-Xmx1g', '-Xss2m']
+}

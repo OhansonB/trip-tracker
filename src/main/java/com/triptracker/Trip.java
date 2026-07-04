@@ -108,7 +108,7 @@ public class Trip {
         if (npcAggregateToRemove != null) {
             npcAggregations.remove(npcAggregateToRemove);
         } else {
-            System.out.println("You have tried to remove an NPC aggregation for a trip where an aggregation does not exist");
+            // NPC aggregation not found for removal - this shouldn't happen in normal operation
         }
     }
 
@@ -207,7 +207,6 @@ public class Trip {
                 parentPlugin.removeTrip(this.tripName);
                 break;
             case JOptionPane.NO_OPTION:
-                System.out.println("Trip not deleted!");
                 break;
         }
     }
@@ -229,7 +228,7 @@ public class Trip {
 
             statusLabel.setText("(inactive)");
         } else {
-            System.out.println("Trip must be inactive to add delete button");
+            // Trip must be inactive to add delete button
         }
     }
 
