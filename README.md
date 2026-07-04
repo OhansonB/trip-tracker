@@ -85,6 +85,7 @@ A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour stats, 
 ## Known Limitations
 
 - Items going directly to the **herb sack** or **seed box** (without touching the ground or inventory) may not be tracked. For accurate tracking during trips, consider closing these containers.
+- **Farming herbs**, fishing catches, ore mined, and other skilling outputs are not tracked — the plugin focuses on loot from combat, thieving, and reward sources.
 - Coin pouch values are **estimates** based on average GP per pickpocket for each NPC.
 - Chest loot tracked via inventory diff may occasionally miss items if other inventory changes happen on the same game tick.
 
