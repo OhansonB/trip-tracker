@@ -20,6 +20,17 @@ public interface EnhancedLootTrackerConfig extends Config {
 
 	@ConfigItem(
 			position = 2,
+			keyName = "debugMode",
+			name = "Debug mode",
+			description = "Show detection events in game chat for troubleshooting"
+	)
+	default boolean debugMode()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			position = 2,
 			keyName = "maxDrops",
 			name = "Max drops to keep (10-10000)",
 			description = "Maximum number of individual drop events to persist (oldest are removed first)"

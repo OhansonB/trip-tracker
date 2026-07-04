@@ -221,6 +221,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		lastNpcKilled = npcName;
 		final int combat = npc.getCombatLevel();
 
+		debugChat("NPC kill: " + npcName + " (lvl " + combat + ") - " + items.size() + " items");
+
 		TrackableItemDrop newItemDrop = new TrackableItemDrop(npcName, combat);
 
 		for (final ItemStack item: items) {
@@ -255,6 +257,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (source == null) {
 			return;
 		}
+
+		debugChat("Widget loaded: " + source.getDisplayName() + " (interfaceId=" + widgetLoaded.getGroupId() + ")");
 
 		// Raids can be opened multiple times - prevent duplicate tracking
 		if (source == RewardSource.CHAMBERS_OF_XERIC || source == RewardSource.THEATRE_OF_BLOOD
@@ -305,6 +309,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			String pickpocketTarget = WordUtils.capitalize(pickpocketMatcher.group("target"));
 
 			lastPickpocketTarget = pickpocketTarget;
+			debugChat("Pickpocket detected: " + pickpocketTarget);
 
 			// Use the pre-change snapshot that was captured on the last inventory change.
 			// referenceInventorySnapshot is maintained continuously in onItemContainerChanged
@@ -365,6 +370,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		awaitingLootDiff = true;
 		pendingLootEventName = eventName;
 		preLootInventorySnapshot = getPlayerInventorySnapshot();
+		debugChat("Loot trigger: " + eventName + " (awaiting inventory change)");
 	}
 
 	private static final int INVENTORY_CONTAINER_ID = 93; // Standard player inventory container ID
@@ -826,6 +832,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public void onTripStatusChanged() {
 		storageService.saveTrips(trips);
+	}
+
+	/**
+	 * Sends a debug message to game chat when debug mode is enabled.
+	 */
+	private void debugChat(String message) {
+		if (config.debugMode()) {
+			chatMessageManager.queue(QueuedMessage.builder()
+					.type(ChatMessageType.GAMEMESSAGE)
+					.runeLiteFormattedMessage("[Trip Tracker] " + message)
+					.build());
+		}
 	}
 
 	public void showTripComparison(int preSelectedTripId) {
