@@ -8,7 +8,9 @@ import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
@@ -105,6 +107,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private final ArrayList<Trip> trips = new ArrayList<>();
 	private int numberOfTrips = 0;
 	private boolean pickpocketHasOccurred;
+	private boolean chestLooted;
 	private TripStorageService storageService;
 
 	@Provides
@@ -182,6 +185,13 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	@Subscribe
+	public void onGameStateChanged(GameStateChanged event) {
+		if (event.getGameState() == GameState.LOADING) {
+			chestLooted = false;
+		}
+	}
+
+	@Subscribe
 	public void onNpcLootReceived(final NpcLootReceived npcLootReceived) {
 		final NPC npc = npcLootReceived.getNpc();
 		final Collection<ItemStack> items = npcLootReceived.getItems();
@@ -216,6 +226,44 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 
 		processNewDrop(newItemDrop);
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded widgetLoaded) {
+		RewardSource source = RewardSource.fromInterfaceId(widgetLoaded.getGroupId());
+		if (source == null) {
+			return;
+		}
+
+		// Raids can be opened multiple times - prevent duplicate tracking
+		if (source == RewardSource.CHAMBERS_OF_XERIC || source == RewardSource.THEATRE_OF_BLOOD
+				|| source == RewardSource.TOMBS_OF_AMASCUT || source == RewardSource.FORTIS_COLOSSEUM) {
+			if (chestLooted) {
+				return;
+			}
+			chestLooted = true;
+		}
+
+		final ItemContainer container = client.getItemContainer(source.getContainerID());
+		if (container == null) {
+			return;
+		}
+
+		final String eventName = source.getDisplayName();
+		lastNpcKilled = eventName;
+
+		TrackableItemDrop newItemDrop = new TrackableItemDrop(eventName, 0);
+
+		for (Item item : container.getItems()) {
+			if (item.getId() > -1 && item.getQuantity() > 0) {
+				TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
+				newItemDrop.addLootToDrop(droppedItem);
+			}
+		}
+
+		if (!newItemDrop.getDroppedItems().isEmpty()) {
+			processNewDrop(newItemDrop);
+		}
 	}
 
 	@Subscribe
