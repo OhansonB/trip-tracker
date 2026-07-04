@@ -161,6 +161,19 @@ public class Trip {
         return result.toString().trim();
     }
 
+    /**
+     * Calculates GP earned per hour based on trip value and duration.
+     * Returns 0 if the trip has been active for less than 1 second.
+     */
+    public long getGpPerHour() {
+        long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
+        long durationMs = endTime - tripStartTimeEpoch;
+        if (durationMs <= 0) {
+            return 0;
+        }
+        return (tripValue * 3600000L) / durationMs;
+    }
+
     public static String formatTime(long epochMillis) {
         Date date = new Date(epochMillis);
         Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");

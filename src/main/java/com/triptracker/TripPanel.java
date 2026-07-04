@@ -2,13 +2,10 @@ package com.triptracker;
 
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.util.ImageUtil;
-import net.runelite.client.util.SwingUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 
 /**
  * Swing UI panel for displaying and controlling a Trip.
@@ -16,36 +13,11 @@ import java.awt.image.BufferedImage;
  */
 public class TripPanel {
     private final Trip trip;
-    private final JButton stopTripButton = new JButton();
-    private final JButton deleteTripButton = new JButton();
-    private final JButton tripInfoButton = new JButton();
     private final JLabel statusLabel = new JLabel();
     private JLabel statsLabel;
-    private JPanel innerRightPanel;
+    private JLabel summaryPanelTitle;
     private JPanel lootPanel;
     private Timer statsTimer;
-
-    private static final ImageIcon STOP_TRIP_TRACKER_ICON;
-    private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
-    private static final ImageIcon DELETE_TRIP_TRACKER_ICON;
-    private static final ImageIcon DELETE_TRIP_TRACKER_ICON_HOVER;
-    private static final ImageIcon TRIP_INFO_ICON;
-    private static final ImageIcon TRIP_INFO_ICON_HOVER;
-
-    static {
-        final BufferedImage stopIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/stop_trip_icon.png");
-        final BufferedImage deleteIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/delete_trip_icon.png");
-        final BufferedImage infoIcon = ImageUtil.loadImageResource(EnhancedLootTrackerPlugin.class, "/info_icon.png");
-
-        STOP_TRIP_TRACKER_ICON = new ImageIcon(stopIcon);
-        STOP_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(stopIcon, -180));
-
-        DELETE_TRIP_TRACKER_ICON = new ImageIcon(deleteIcon);
-        DELETE_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(deleteIcon, -180));
-
-        TRIP_INFO_ICON = new ImageIcon(infoIcon);
-        TRIP_INFO_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(infoIcon, -180));
-    }
 
     public TripPanel(Trip trip) {
         this.trip = trip;
@@ -65,65 +37,35 @@ public class TripPanel {
         headerPanel.setBorder(new EmptyBorder(5, 7, 5, 7));
         outerPanel.add(headerPanel, BorderLayout.PAGE_START);
 
-        // Left side: trip name + stats
-        JPanel leftPanel = new JPanel();
-        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
-        leftPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+        // Content panel: trip name + stats + status
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
 
-        JLabel summaryPanelTitle = new JLabel(trip.getTripName());
+        summaryPanelTitle = new JLabel(trip.getTripName());
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
-        summaryPanelTitle.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        summaryPanelTitle.setToolTipText("Click to rename");
-        summaryPanelTitle.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                String newName = JOptionPane.showInputDialog(null,
-                        "Enter new trip name:", trip.getTripName());
-                if (newName != null && !newName.trim().isEmpty()) {
-                    trip.setTripName(newName.trim());
-                    summaryPanelTitle.setText(newName.trim());
-                    trip.getParentPlugin().onTripStatusChanged();
-                }
-            }
-        });
-        leftPanel.add(summaryPanelTitle);
+        contentPanel.add(summaryPanelTitle);
 
-        // Inline stats: kills | value | duration
+        // Inline stats: kills | value | gp/hr | duration
         String statsText = trip.getTripKills() + " kills \u2022 " +
                 FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
+                FormatUtil.shortenNumber(trip.getGpPerHour()) + " gp/hr \u2022 " +
                 trip.calculateTripDuration();
         statsLabel = new JLabel(statsText);
         statsLabel.setFont(FontManager.getRunescapeSmallFont());
         statsLabel.setForeground(Color.GRAY);
-        leftPanel.add(statsLabel);
+        contentPanel.add(statsLabel);
 
-        leftPanel.add(statusLabel);
-        headerPanel.add(leftPanel, BorderLayout.WEST);
+        contentPanel.add(statusLabel);
+        headerPanel.add(contentPanel, BorderLayout.CENTER);
 
-        // Right side: buttons
-        innerRightPanel = new JPanel();
-        innerRightPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerRightPanel.setLayout(new FlowLayout(FlowLayout.TRAILING, 2, 0));
-        headerPanel.add(innerRightPanel, BorderLayout.EAST);
-
-        SwingUtil.removeButtonDecorations(tripInfoButton);
-        tripInfoButton.setIcon(TRIP_INFO_ICON);
-        tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
-        tripInfoButton.setToolTipText(buildTooltipText());
-        tripInfoButton.setPreferredSize(new Dimension(15, 25));
-        tripInfoButton.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
-                tripInfoButton.setToolTipText(buildTooltipText());
-            }
-        });
-
-        innerRightPanel.add(tripInfoButton);
+        // Right-click context menu on the entire header
+        headerPanel.setComponentPopupMenu(buildContextMenu());
+        headerPanel.setToolTipText("Right-click for options");
 
         if (trip.getTripStatus()) {
-            addStopButton();
             startStatsTimer();
-        } else {
-            addDeleteButton();
         }
 
         lootPanel = new JPanel();
@@ -131,6 +73,34 @@ public class TripPanel {
         outerPanel.add(lootPanel);
 
         return outerPanel;
+    }
+
+    private JPopupMenu buildContextMenu() {
+        JPopupMenu menu = new JPopupMenu();
+
+        JMenuItem renameItem = new JMenuItem("Rename");
+        renameItem.addActionListener(e -> {
+            String newName = JOptionPane.showInputDialog(null,
+                    "Enter new trip name:", trip.getTripName());
+            if (newName != null && !newName.trim().isEmpty()) {
+                trip.setTripName(newName.trim());
+                summaryPanelTitle.setText(newName.trim());
+                trip.getParentPlugin().onTripStatusChanged();
+            }
+        });
+        menu.add(renameItem);
+
+        if (trip.getTripStatus()) {
+            JMenuItem stopItem = new JMenuItem("Stop trip");
+            stopItem.addActionListener(e -> stopTrip());
+            menu.add(stopItem);
+        } else {
+            JMenuItem deleteItem = new JMenuItem("Delete trip");
+            deleteItem.addActionListener(e -> deleteTrip());
+            menu.add(deleteItem);
+        }
+
+        return menu;
     }
 
     public void stopTrip() {
@@ -141,11 +111,10 @@ public class TripPanel {
                     JOptionPane.YES_NO_OPTION);
 
             if (selectedOption == JOptionPane.YES_OPTION) {
-                stopTripButton.setVisible(false);
                 trip.setStatus(false);
-                addDeleteButton();
                 stopStatsTimer();
                 updateStats();
+                statusLabel.setText("(inactive)");
                 trip.getParentPlugin().onTripStatusChanged();
             }
         }
@@ -158,51 +127,17 @@ public class TripPanel {
                 JOptionPane.YES_NO_OPTION);
 
         if (selectedOption == JOptionPane.YES_OPTION) {
+            stopStatsTimer();
             trip.getParentPlugin().removeTrip(trip.getTripName());
         }
     }
 
-    public void addDeleteButton() {
-        if (!trip.getTripStatus()) {
-            SwingUtil.removeButtonDecorations(deleteTripButton);
-            deleteTripButton.setIcon(DELETE_TRIP_TRACKER_ICON);
-            deleteTripButton.setRolloverIcon(DELETE_TRIP_TRACKER_ICON_HOVER);
-            deleteTripButton.setToolTipText("Click to delete the trip");
-            deleteTripButton.setPreferredSize(new Dimension(25, 25));
-            deleteTripButton.setBorder(new EmptyBorder(0, 0, 0, 10));
-
-            if (deleteTripButton.getActionListeners().length == 0) {
-                deleteTripButton.addActionListener(e -> deleteTrip());
-            }
-
-            innerRightPanel.add(deleteTripButton);
-            statusLabel.setText("(inactive)");
-        }
-    }
-
-    public void addStopButton() {
-        SwingUtil.removeButtonDecorations(stopTripButton);
-        stopTripButton.setIcon(STOP_TRIP_TRACKER_ICON);
-        stopTripButton.setRolloverIcon(STOP_TRIP_TRACKER_ICON_HOVER);
-        stopTripButton.setToolTipText("Click to end the trip");
-        stopTripButton.setPreferredSize(new Dimension(25, 25));
-        stopTripButton.setBorder(new EmptyBorder(0, 0, 0, 10));
-
-        if (stopTripButton.getActionListeners().length == 0) {
-            stopTripButton.addActionListener(e -> stopTrip());
-        }
-
-        innerRightPanel.add(stopTripButton);
-        statusLabel.setText("(active)");
-    }
-
     public void setStatus(boolean status) {
         if (!status) {
-            stopTripButton.setVisible(false);
-            addDeleteButton();
+            stopStatsTimer();
+            statusLabel.setText("(inactive)");
         } else {
-            deleteTripButton.setVisible(false);
-            addStopButton();
+            statusLabel.setText("(active)");
         }
     }
 
@@ -220,6 +155,7 @@ public class TripPanel {
         if (statsLabel != null) {
             String statsText = trip.getTripKills() + " kills \u2022 " +
                     FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
+                    FormatUtil.shortenNumber(trip.getGpPerHour()) + " gp/hr \u2022 " +
                     trip.calculateTripDuration();
             statsLabel.setText(statsText);
         }
@@ -241,18 +177,6 @@ public class TripPanel {
 
     public JPanel getLootPanel() {
         return lootPanel;
-    }
-
-    private String buildTooltipText() {
-        String startTime = trip.getTripStartTime() != null ? trip.getTripStartTime() : "unknown";
-        String endTime = trip.getTripEndTime() != null ? trip.getTripEndTime() : "n/a";
-        return String.format(
-                "<html>Trip started: %s<br>Trip ended: %s<br>Trip duration: %s<br>Trip kills: %d<br>Trip value: %s gp</html>",
-                startTime,
-                endTime,
-                trip.calculateTripDuration(),
-                trip.getTripKills(),
-                FormatUtil.shortenNumber(trip.getTripValue()));
     }
 
     public Trip getTrip() {

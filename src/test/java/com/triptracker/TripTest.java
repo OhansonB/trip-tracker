@@ -126,4 +126,37 @@ public class TripTest {
         assertTrue(trip.matches("New Name"));
         assertFalse(trip.matches("TRIP 1"));
     }
+
+    @Test
+    public void testGpPerHourZeroWhenNoValue() {
+        assertEquals(0, trip.getGpPerHour());
+    }
+
+    @Test
+    public void testGpPerHourCalculation() {
+        // Create a trip with known start time and value using the restoration constructor
+        Mockito.when(mockPlugin.getNextTripNumber()).thenReturn(99);
+        long startTime = System.currentTimeMillis() - 3600000L; // 1 hour ago
+        Trip hourTrip = new Trip("Test", mockPlugin, true,
+                startTime, "start", "n/a", 0L, 5, 100000, 99);
+
+        // 100000gp over 1 hour = ~100000 gp/hr
+        long gpPerHour = hourTrip.getGpPerHour();
+        assertTrue("Expected ~100000 gp/hr but got " + gpPerHour,
+                gpPerHour > 99000 && gpPerHour < 101000);
+    }
+
+    @Test
+    public void testGpPerHourFrozenWhenInactive() {
+        Mockito.when(mockPlugin.getNextTripNumber()).thenReturn(99);
+        long startTime = System.currentTimeMillis() - 7200000L; // 2 hours ago
+        long endTime = System.currentTimeMillis() - 3600000L;   // ended 1 hour ago
+        Trip stoppedTrip = new Trip("Test", mockPlugin, false,
+                startTime, "start", "end", endTime, 10, 200000, 99);
+
+        // 200000gp over 1 hour (start to end) = ~200000 gp/hr
+        long gpPerHour = stoppedTrip.getGpPerHour();
+        assertTrue("Expected ~200000 gp/hr but got " + gpPerHour,
+                gpPerHour > 199000 && gpPerHour < 201000);
+    }
 }
