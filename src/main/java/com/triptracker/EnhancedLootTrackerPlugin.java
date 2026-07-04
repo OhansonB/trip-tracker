@@ -30,7 +30,11 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -60,6 +64,44 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			"H.A.M. Member", "Man",
 			"H.A.M. Member", "Woman"
 	);
+
+	private static final int COINS_ID = 995;
+
+	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
+	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
+			22521, 22522, 22523, 22524, 22525, 22526, 22527, 22528, 22529, 22530,
+			22531, 22532, 22533, 22534, 22535, 22536, 22537, 22538, 24703
+	));
+
+	// Average coin value per pickpocket for each NPC (midpoint of their known ranges)
+	private static final Map<String, Integer> PICKPOCKET_COIN_VALUES = new HashMap<>();
+	static {
+		PICKPOCKET_COIN_VALUES.put("Man", 3);
+		PICKPOCKET_COIN_VALUES.put("Woman", 3);
+		PICKPOCKET_COIN_VALUES.put("Farmer", 9);
+		PICKPOCKET_COIN_VALUES.put("H.A.M. Member", 3);
+		PICKPOCKET_COIN_VALUES.put("Warrior", 18);
+		PICKPOCKET_COIN_VALUES.put("Al-Kharid Warrior", 18);
+		PICKPOCKET_COIN_VALUES.put("Rogue", 40);
+		PICKPOCKET_COIN_VALUES.put("Cave Goblin", 30);
+		PICKPOCKET_COIN_VALUES.put("Guard", 30);
+		PICKPOCKET_COIN_VALUES.put("Fremennik Citizen", 40);
+		PICKPOCKET_COIN_VALUES.put("Bearded Pollnivnian Bandit", 40);
+		PICKPOCKET_COIN_VALUES.put("Wealthy Citizen", 85);
+		PICKPOCKET_COIN_VALUES.put("Desert Bandit", 30);
+		PICKPOCKET_COIN_VALUES.put("Knight Of Ardougne", 50);
+		PICKPOCKET_COIN_VALUES.put("Knight Of Varlamore", 50);
+		PICKPOCKET_COIN_VALUES.put("Pollnivnian Bandit", 50);
+		PICKPOCKET_COIN_VALUES.put("Pirate", 40);
+		PICKPOCKET_COIN_VALUES.put("Watchman", 60);
+		PICKPOCKET_COIN_VALUES.put("Menaphite Thug", 60);
+		PICKPOCKET_COIN_VALUES.put("Paladin", 80);
+		PICKPOCKET_COIN_VALUES.put("Gnome", 300);
+		PICKPOCKET_COIN_VALUES.put("Hero", 200);
+		PICKPOCKET_COIN_VALUES.put("Vyre", 700);
+		PICKPOCKET_COIN_VALUES.put("Elf", 280);
+		PICKPOCKET_COIN_VALUES.put("TzHaar-Hur", 80);
+	}
 	private String lastPickpocketTarget;
 	private InventoryID inventoryId;
 	private Multiset<Integer> inventorySnapshot;
@@ -198,14 +240,29 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				// Create a new itemDrop object
 				TrackableItemDrop itemDrop = new TrackableItemDrop(lastPickpocketTarget, 0);
 
+				// Look up the average coin value for this NPC's pickpocket
+				int coinValuePerPouch = PICKPOCKET_COIN_VALUES.getOrDefault(lastPickpocketTarget, 1);
+
 				// Iterate over itemStacks and create TrackableDroppedItem for each item stack in that list
 				// and add TrackableDroppedItem to TrackableItemDrop
 				for (ItemStack itemStack : itemStacks) {
 					int itemId = itemStack.getId();
 					int itemQuantity = itemStack.getQuantity() > 0 ? itemStack.getQuantity() : 1;
 
-					TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
-					itemDrop.addLootToDrop(newDroppedItem);
+					// Replace coin pouches with coins at the estimated value for this NPC
+					if (COIN_POUCH_IDS.contains(itemId)) {
+						int estimatedCoins = coinValuePerPouch * itemQuantity;
+						TrackableDroppedItem coinItem = new TrackableDroppedItem(
+								COINS_ID,
+								"Coins",
+								estimatedCoins,
+								1,
+								1);
+						itemDrop.addLootToDrop(coinItem);
+					} else {
+						TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
+						itemDrop.addLootToDrop(newDroppedItem);
+					}
 				}
 
 				// Set lastNpcKilled so trip/grouped views attribute loot to the correct target
