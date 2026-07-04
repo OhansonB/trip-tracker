@@ -83,59 +83,56 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         trackingModeControlPanel.setLayout(new BorderLayout());
         trackingModeControlPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        trackingModeControlPanel.setPreferredSize(new Dimension(0, 30));
+        trackingModeControlPanel.setPreferredSize(new Dimension(0, 40));
         trackingModeControlPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-        final JPanel modeControlsPanel = new JPanel(new GridLayout(1, 3, 10, 0));
+        final JPanel modeControlsPanel = new JPanel(new GridLayout(1, 3, 5, 0));
         modeControlsPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
 
-        SwingUtil.removeButtonDecorations(listModeButton);
-        listModeButton.setIcon(LIST_MODE_ICON_UNSELECTED);
-        listModeButton.setRolloverIcon(LIST_MODE_ICON_HOVER);
-        listModeButton.setSelectedIcon(LIST_MODE_ICON);
-        listModeButton.setToolTipText("Show each loot drop separately");
-        listModeButton.addActionListener(e -> changeTrackingMode(0));
-
-        SwingUtil.removeButtonDecorations(groupedModeButton);
-        groupedModeButton.setIcon(GROUPED_MODE_ICON_UNSELECTED);
-        groupedModeButton.setRolloverIcon(GROUPED_MODE_ICON_HOVER);
-        groupedModeButton.setSelectedIcon(GROUPED_MODE_ICON);
-        groupedModeButton.setToolTipText("Show loot drops grouped by NPC name");
-        groupedModeButton.addActionListener(e -> changeTrackingMode(1));
-
-        SwingUtil.removeButtonDecorations(tripModeButton);
-        tripModeButton.setIcon(TRIP_MODE_ICON_UNSELECTED);
-        tripModeButton.setRolloverIcon(TRIP_MODE_ICON_HOVER);
-        tripModeButton.setSelectedIcon(TRIP_MODE_ICON);
-        tripModeButton.setToolTipText("Show controls for creating loot trips");
-        tripModeButton.addActionListener(e -> changeTrackingMode(2));
+        // List mode button with label
+        JPanel listPanel = buildModeButton(listModeButton, LIST_MODE_ICON_UNSELECTED,
+                LIST_MODE_ICON_HOVER, LIST_MODE_ICON, "List", 0);
+        JPanel groupedPanel = buildModeButton(groupedModeButton, GROUPED_MODE_ICON_UNSELECTED,
+                GROUPED_MODE_ICON_HOVER, GROUPED_MODE_ICON, "Grouped", 1);
+        JPanel tripPanel = buildModeButton(tripModeButton, TRIP_MODE_ICON_UNSELECTED,
+                TRIP_MODE_ICON_HOVER, TRIP_MODE_ICON, "Trips", 2);
 
         ButtonGroup buttonGroup = new ButtonGroup();
         buttonGroup.add(listModeButton);
         buttonGroup.add(groupedModeButton);
         buttonGroup.add(tripModeButton);
 
-        switch (DEFAULT_TRACKING_MODE) {
-            case 0:
-                listModeButton.setSelected(true);
-                break;
-            case 1:
-                groupedModeButton.setSelected(true);
-                break;
-            case 2:
-                tripModeButton.setSelected(true);
-                break;
-            default:
-                break;
-        }
+        listModeButton.setSelected(true);
 
-        modeControlsPanel.add(listModeButton);
-        modeControlsPanel.add(groupedModeButton);
-        modeControlsPanel.add(tripModeButton);
+        modeControlsPanel.add(listPanel);
+        modeControlsPanel.add(groupedPanel);
+        modeControlsPanel.add(tripPanel);
 
-        trackingModeControlPanel.add(modeControlsPanel, BorderLayout.EAST);
+        trackingModeControlPanel.add(modeControlsPanel, BorderLayout.CENTER);
 
         return trackingModeControlPanel;
+    }
+
+    private JPanel buildModeButton(JRadioButton button, ImageIcon icon, ImageIcon hoverIcon,
+                                   ImageIcon selectedIcon, String label, int modeId) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+
+        SwingUtil.removeButtonDecorations(button);
+        button.setIcon(icon);
+        button.setRolloverIcon(hoverIcon);
+        button.setSelectedIcon(selectedIcon);
+        button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.addActionListener(e -> changeTrackingMode(modeId));
+
+        JLabel textLabel = new JLabel(label, SwingConstants.CENTER);
+        textLabel.setFont(FontManager.getRunescapeSmallFont());
+        textLabel.setForeground(Color.GRAY);
+
+        panel.add(button, BorderLayout.CENTER);
+        panel.add(textLabel, BorderLayout.SOUTH);
+
+        return panel;
     }
 
     private JPanel buildLootBoxPanel() {
@@ -190,30 +187,69 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         if (selectedTrackingMode == 2) {
             lootBoxPanel.add(buildTripTrackerControls());
 
-            // tripPanels is a map of trip names to trip panels associated with that trip
-            tripPanelBoxes.forEach((aKey, aValue) -> {
+            if (tripPanelBoxes.isEmpty()) {
+                // Empty state for trip view
+                lootBoxPanel.add(buildEmptyStateLabel("No trips yet \u2014 click + to start one."));
+            } else {
+                // tripPanels is a map of trip names to trip panels associated with that trip
+                tripPanelBoxes.forEach((aKey, aValue) -> {
+                    TripPanel tripPanel = tripsMap.get(aKey);
+                    if (tripPanel != null) {
+                        lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
+                        lootBoxPanel.revalidate();
+                        lootBoxPanel.repaint();
+                        tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
+                            LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
+                            JPanel panel = panelBox.buildPanelBox();
+                            panel.setName(bKey);
+                            tripPanel.addLootPanel(panel);
+                        });
+                    }
+                });
+            }
 
-                // Build a trip header with the panel name
-                TripPanel tripPanel = tripsMap.get(aKey);
-                if (tripPanel != null) {
-                    lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
-                    lootBoxPanel.revalidate();
-                    lootBoxPanel.repaint();
-                    // Get the trip panels map associated with the given trip and iterate over them
-                    tripPanelBoxes.get(aKey).forEach((bKey, bValue) -> {
-
-                        LootTrackingPanelBox panelBox = tripPanelBoxes.get(aKey).get(bKey);
-                        JPanel panel = panelBox.buildPanelBox();
-                        panel.setName(bKey);
-                        tripPanel.addLootPanel(panel);
-
-                    });
-                }
-            });
-
+        } else if (selectedTrackingMode == 1) {
+            // Grouped view
+            if (parentPlugin.getListViewDropArray().isEmpty()) {
+                lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
+            } else {
+                lootBoxPanel.add(buildSubtitleLabel("Sorted by most recent kill"));
+                parentPlugin.rebuildLootPanel();
+            }
         } else {
-            parentPlugin.rebuildLootPanel();
+            // List view
+            if (parentPlugin.getListViewDropArray().isEmpty()) {
+                lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
+            } else {
+                parentPlugin.rebuildLootPanel();
+            }
         }
+    }
+
+    private JPanel buildEmptyStateLabel(String text) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(20, 10, 20, 10));
+
+        JLabel label = new JLabel("<html><center>" + text + "</center></html>", SwingConstants.CENTER);
+        label.setFont(FontManager.getRunescapeSmallFont());
+        label.setForeground(Color.GRAY);
+        panel.add(label, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel buildSubtitleLabel(String text) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(4, 0, 2, 0));
+
+        JLabel label = new JLabel(text, SwingConstants.CENTER);
+        label.setFont(FontManager.getRunescapeSmallFont());
+        label.setForeground(Color.GRAY);
+        panel.add(label, BorderLayout.CENTER);
+
+        return panel;
     }
 
     // This method is used for adding a loot box when in list view mode
@@ -341,12 +377,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             TripPanel tripPanel = new TripPanel(parentPlugin.getActiveTrip());
             tripsMap.put(tripName, tripPanel);
 
-            lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
-            lootBoxPanel.revalidate();
-            lootBoxPanel.repaint();
-
             activeTripLootPanels = new LinkedHashMap<>();
             tripPanelBoxes.put(tripName, activeTripLootPanels);
+
+            // Rebuild to remove empty state and show the new trip
+            rebuildLootPanel();
 
         } else {
             int selectedOption = JOptionPane.showConfirmDialog(null,
@@ -379,8 +414,13 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JButton clearButton = new JButton("Clear all data");
         clearButton.setFont(FontManager.getRunescapeSmallFont());
-        clearButton.setForeground(Color.GRAY);
+        clearButton.setForeground(Color.WHITE);
+        clearButton.setBackground(new Color(120, 30, 30));
+        clearButton.setOpaque(true);
+        clearButton.setBorder(new EmptyBorder(5, 10, 5, 10));
+        clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearButton.setToolTipText("Delete all tracked drops and trips");
+        clearButton.setFocusPainted(false);
         clearButton.addActionListener(e -> confirmClearAllData());
         footer.add(clearButton, BorderLayout.CENTER);
 

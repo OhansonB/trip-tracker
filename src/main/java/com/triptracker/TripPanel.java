@@ -20,8 +20,10 @@ public class TripPanel {
     private final JButton deleteTripButton = new JButton();
     private final JButton tripInfoButton = new JButton();
     private final JLabel statusLabel = new JLabel();
+    private JLabel statsLabel;
     private JPanel innerRightPanel;
     private JPanel lootPanel;
+    private Timer statsTimer;
 
     private static final ImageIcon STOP_TRIP_TRACKER_ICON;
     private static final ImageIcon STOP_TRIP_TRACKER_ICON_HOVER;
@@ -57,51 +59,63 @@ public class TripPanel {
         outerPanel.setLayout(new BorderLayout());
         outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        final JPanel innerPanel = new JPanel();
-        innerPanel.setLayout(new GridLayout(0, 2));
-        innerPanel.setPreferredSize(new Dimension(230, 35));
-        outerPanel.add(innerPanel, BorderLayout.PAGE_START);
+        final JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BorderLayout());
+        headerPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+        headerPanel.setBorder(new EmptyBorder(5, 7, 5, 7));
+        outerPanel.add(headerPanel, BorderLayout.PAGE_START);
 
-        JPanel innerLeftPanel = new JPanel();
-        innerLeftPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerLeftPanel.setLayout(new FlowLayout(FlowLayout.LEADING));
-        innerPanel.add(innerLeftPanel);
-
-        innerRightPanel = new JPanel();
-        innerRightPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
-        innerRightPanel.setLayout(new FlowLayout(FlowLayout.TRAILING));
-        innerPanel.add(innerRightPanel);
+        // Left side: trip name + stats
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+        leftPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
 
         JLabel summaryPanelTitle = new JLabel(trip.getTripName());
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
         summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
-        summaryPanelTitle.setBorder(new EmptyBorder(5, 0, 0, 0));
+        leftPanel.add(summaryPanelTitle);
+
+        // Inline stats: kills | value | duration
+        String statsText = trip.getTripKills() + " kills \u2022 " +
+                FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
+                trip.calculateTripDuration();
+        statsLabel = new JLabel(statsText);
+        statsLabel.setFont(FontManager.getRunescapeSmallFont());
+        statsLabel.setForeground(Color.GRAY);
+        leftPanel.add(statsLabel);
+
+        leftPanel.add(statusLabel);
+        headerPanel.add(leftPanel, BorderLayout.WEST);
+
+        // Right side: buttons
+        innerRightPanel = new JPanel();
+        innerRightPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
+        innerRightPanel.setLayout(new FlowLayout(FlowLayout.TRAILING, 2, 0));
+        headerPanel.add(innerRightPanel, BorderLayout.EAST);
 
         SwingUtil.removeButtonDecorations(tripInfoButton);
         tripInfoButton.setIcon(TRIP_INFO_ICON);
         tripInfoButton.setRolloverIcon(TRIP_INFO_ICON_HOVER);
         tripInfoButton.setToolTipText(buildTooltipText());
         tripInfoButton.setPreferredSize(new Dimension(15, 25));
-        tripInfoButton.setBorder(new EmptyBorder(0, 0, 0, 2));
         tripInfoButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 tripInfoButton.setToolTipText(buildTooltipText());
             }
         });
 
-        innerLeftPanel.add(summaryPanelTitle);
-        innerLeftPanel.add(statusLabel);
         innerRightPanel.add(tripInfoButton);
+
+        if (trip.getTripStatus()) {
+            addStopButton();
+            startStatsTimer();
+        } else {
+            addDeleteButton();
+        }
 
         lootPanel = new JPanel();
         lootPanel.setLayout(new BoxLayout(lootPanel, BoxLayout.Y_AXIS));
         outerPanel.add(lootPanel);
-
-        if (trip.getTripStatus()) {
-            addStopButton();
-        } else {
-            addDeleteButton();
-        }
 
         return outerPanel;
     }
@@ -117,6 +131,8 @@ public class TripPanel {
                 stopTripButton.setVisible(false);
                 trip.setStatus(false);
                 addDeleteButton();
+                stopStatsTimer();
+                updateStats();
                 trip.getParentPlugin().onTripStatusChanged();
             }
         }
@@ -181,6 +197,33 @@ public class TripPanel {
         this.lootPanel.add(panel, 0);
         this.lootPanel.revalidate();
         this.lootPanel.repaint();
+        updateStats();
+    }
+
+    /**
+     * Refreshes the inline stats label with current trip data.
+     */
+    public void updateStats() {
+        if (statsLabel != null) {
+            String statsText = trip.getTripKills() + " kills \u2022 " +
+                    FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
+                    trip.calculateTripDuration();
+            statsLabel.setText(statsText);
+        }
+    }
+
+    private void startStatsTimer() {
+        if (statsTimer == null) {
+            statsTimer = new Timer(1000, e -> updateStats());
+            statsTimer.start();
+        }
+    }
+
+    private void stopStatsTimer() {
+        if (statsTimer != null) {
+            statsTimer.stop();
+            statsTimer = null;
+        }
     }
 
     public JPanel getLootPanel() {
