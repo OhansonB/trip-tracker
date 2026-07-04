@@ -38,6 +38,17 @@ A drill-down view for each trip showing:
 - Timeline of kills (when during the trip each kill happened)
 Accessed via right-click → "Details" on a trip header.
 
+
+### 9. Aggregate multiple drops of the same item in list view
+
+![alt text](image.png)
+
+### 10. Exclude certain items / monsters from drops and trips
+
+### 11. In Trip view, order within trip by value of NPC rather than by last killed
+
+### 12. Export pretty print for e.g., Discord
+
 ## Priority Suggestion
 
 | # | Feature | Impact | Effort | Suggested Order |
