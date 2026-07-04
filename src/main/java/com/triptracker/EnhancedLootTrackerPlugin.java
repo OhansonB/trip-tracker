@@ -485,9 +485,25 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public int getNumberOfTrips() {
-		// If size is 0 then the first trip is named trip 1; leading to a situation where if size is 1 then name is
-		// also trip 1. Therefore, trip name is based on size + 1.
 		return numberOfTrips;
+	}
+
+	/**
+	 * Returns the next trip number based on the highest existing trip number.
+	 */
+	public int getNextTripNumber() {
+		int maxNumber = 0;
+		for (Trip trip : trips) {
+			String name = trip.getTripName();
+			if (name.startsWith("TRIP ")) {
+				try {
+					int num = Integer.parseInt(name.substring(5));
+					maxNumber = Math.max(maxNumber, num);
+				} catch (NumberFormatException ignored) {
+				}
+			}
+		}
+		return Math.max(maxNumber, numberOfTrips) + 1;
 	}
 
 	public void getItemAggregations(String npcName) {

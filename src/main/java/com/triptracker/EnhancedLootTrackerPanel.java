@@ -329,18 +329,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     private void createNewTrip() {
-        String tripName;
         boolean isActiveTrip = parentPlugin.checkForActiveTrip();
 
         if (!isActiveTrip) {
-            if (parentPlugin.getNumberOfTrips() != 0) {
-                int tripNumber = parentPlugin.getNumberOfTrips() + 1;
-                tripName = "TRIP " + tripNumber;
-                parentPlugin.initTrip(tripName);
-            } else {
-                tripName = "TRIP 1";
-                parentPlugin.initTrip(tripName);
-            }
+            String tripName = "TRIP " + parentPlugin.getNextTripNumber();
+            parentPlugin.initTrip(tripName);
 
             TripPanel tripPanel = new TripPanel(parentPlugin.getActiveTrip());
             tripsMap.put(tripName, tripPanel);
