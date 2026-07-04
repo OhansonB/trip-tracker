@@ -117,6 +117,7 @@ public class TripPanel {
                 stopTripButton.setVisible(false);
                 trip.setStatus(false);
                 addDeleteButton();
+                trip.getParentPlugin().onTripStatusChanged();
             }
         }
     }
@@ -187,10 +188,12 @@ public class TripPanel {
     }
 
     private String buildTooltipText() {
+        String startTime = trip.getTripStartTime() != null ? trip.getTripStartTime() : "unknown";
+        String endTime = trip.getTripEndTime() != null ? trip.getTripEndTime() : "n/a";
         return String.format(
-                "<html>Trip started: %s<br>Trip ended: %s<br>Trip duration: %s<br>Trip kills: %s<br>Trip value: %s gp</html>",
-                trip.getTripStartTime(),
-                trip.getTripEndTime(),
+                "<html>Trip started: %s<br>Trip ended: %s<br>Trip duration: %s<br>Trip kills: %d<br>Trip value: %s gp</html>",
+                startTime,
+                endTime,
                 trip.calculateTripDuration(),
                 trip.getTripKills(),
                 FormatUtil.shortenNumber(trip.getTripValue()));

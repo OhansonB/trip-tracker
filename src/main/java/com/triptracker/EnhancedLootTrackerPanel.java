@@ -301,6 +301,35 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     public int getSelectedTrackingMode() { return selectedTrackingMode; }
 
+    /**
+     * Called after persisted data has been loaded to refresh the current view.
+     */
+    public void rebuildAfterLoad() {
+        // Register restored trips so the trip view knows about them
+        for (Trip trip : parentPlugin.getTrips()) {
+            String name = trip.getTripName();
+            if (!tripsMap.containsKey(name)) {
+                TripPanel tripPanel = new TripPanel(trip);
+                tripsMap.put(name, tripPanel);
+
+                // Build loot panel boxes from the trip's restored NPC aggregates
+                LinkedHashMap<String, LootTrackingPanelBox> lootPanels = new LinkedHashMap<>();
+                for (NpcLootAggregate aggregate : trip.getTripAggregates()) {
+                    String npcName = aggregate.getNpcName();
+                    int kills = aggregate.getNumberOfKills();
+                    String lastKill = aggregate.getLastKillTime();
+                    ArrayList<LootAggregation> aggregations = aggregate.getNpcItemAggregations();
+
+                    LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill);
+                    lootPanels.put(npcName, panelBox);
+                }
+                tripPanelBoxes.put(name, lootPanels);
+            }
+        }
+
+        rebuildLootPanel();
+    }
+
     private void createNewTrip() {
         String tripName;
         boolean isActiveTrip = parentPlugin.checkForActiveTrip();

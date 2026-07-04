@@ -25,7 +25,8 @@ public class NpcLootAggregate {
     public void addDropToNpcAggregate (TrackableItemDrop itemDrop) {
         droppedItems.addAll(itemDrop.getDroppedItems());
 
-        Date date = new Date(System.currentTimeMillis());
+        // Use the drop's timestamp for the last kill time
+        Date date = new Date(itemDrop.getDropTimeDate());
         Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
         this.lastKillTime = format.format(date);
 
@@ -72,5 +73,9 @@ public class NpcLootAggregate {
 
     public ArrayList<LootAggregation> getNpcItemAggregations() {
         return lootAggregations;
+    }
+
+    public ArrayList<TrackableDroppedItem> getDroppedItems() {
+        return droppedItems;
     }
 }

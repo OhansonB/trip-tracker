@@ -53,6 +53,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private ItemManager itemManager;
 	@Inject
 	private ClientToolbar clientToolbar;
+	@Inject
+	private net.runelite.client.callback.ClientThread clientThread;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
 	private static final Multimap<String, String> PICKPOCKET_DISAMBIGUATION_MAP = ImmutableMultimap.of(
 			"H.A.M. Member", "Man",
@@ -107,6 +109,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public String activeTripName = null;
 	private static int numberOfTrips = 0;
 	private boolean pickpocketHasOccurred;
+	private TripStorageService storageService;
 
 	@Provides
 	EnhancedLootTrackerConfig provideConfig(ConfigManager configManager) {
@@ -115,6 +118,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Override
 	protected void startUp() throws Exception {
+		storageService = new TripStorageService();
+
 		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
 		panel.setParentPlugin(this);
 
@@ -128,11 +133,51 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				.build();
 
 		clientToolbar.addNavigation(navButton);
+
+		// Restore persisted data on the client thread (ItemManager requires it)
+		clientThread.invokeLater(this::loadPersistedData);
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
+		// Persist data synchronously before shutdown, then clean up the executor
+		storageService.saveTripsSync(trips);
+		storageService.saveDropsSync(listViewDropArray);
+		storageService.shutdown();
+
 		clientToolbar.removeNavigation(navButton);
+	}
+
+	private void loadPersistedData() {
+		// Load drop history
+		List<DropRecord> dropRecords = storageService.loadDrops();
+		for (DropRecord record : dropRecords) {
+			TrackableItemDrop drop = record.toDrop();
+			listViewDropArray.add(drop);
+			addDropToGroupedAggregates(drop);
+		}
+
+		// Load trips (all restored trips are set to inactive since the session is new)
+		List<TripRecord> tripRecords = storageService.loadTrips();
+		for (TripRecord record : tripRecords) {
+			// If the trip was still active when saved, mark it as ended now
+			if (record.tripActive) {
+				record.tripActive = false;
+				if (record.tripEndTime == null || "n/a".equals(record.tripEndTime)) {
+					long endEpoch = System.currentTimeMillis();
+					record.tripEndTime = Trip.formatTimePublic(endEpoch);
+					record.tripEndTimeEpoch = endEpoch;
+				}
+			}
+			Trip trip = record.toTrip(this, itemManager);
+			trips.add(trip);
+			numberOfTrips++;
+		}
+
+		log.debug("Loaded {} drops and {} trips from disk", dropRecords.size(), tripRecords.size());
+
+		// Rebuild the panel UI on the EDT so the loaded data is displayed
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 	}
 
 	@Subscribe
@@ -309,6 +354,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			default:
 				break;
 		}
+
+		// Persist after every drop (async, non-blocking)
+		storageService.saveDrops(listViewDropArray);
+		storageService.saveTrips(trips);
 	}
 
 	private void updateGroupedViewUI() {
@@ -485,6 +534,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		trips.add(new Trip(tripName, this));
 		numberOfTrips++;
 		activeTripName = tripName;
+
+		// Persist trip state change
+		storageService.saveTrips(trips);
 	}
 
 	public int getNumberOfTrips() {
@@ -581,5 +633,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				break;
 			}
 		}
+		// Persist after trip removal
+		storageService.saveTrips(trips);
+	}
+
+	public void onTripStatusChanged() {
+		storageService.saveTrips(trips);
 	}
 }

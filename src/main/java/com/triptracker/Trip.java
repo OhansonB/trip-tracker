@@ -17,6 +17,7 @@ public class Trip {
     private final String tripStartTime;
     private final long tripStartTimeEpoch;
     private String tripEndTime;
+    private long tripEndTimeEpoch;
     private int tripKills;
     private long tripValue;
 
@@ -29,6 +30,23 @@ public class Trip {
         this.tripEndTime = "n/a";
         this.tripKills = 0;
         this.tripValue = 0;
+    }
+
+    /**
+     * Constructor for restoring a trip from persisted data.
+     */
+    Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin, boolean tripActive,
+         long tripStartTimeEpoch, String tripStartTime, String tripEndTime,
+         long tripEndTimeEpoch, int tripKills, long tripValue) {
+        this.parentPlugin = parentPlugin;
+        this.tripName = tripName;
+        this.tripActive = tripActive;
+        this.tripStartTimeEpoch = tripStartTimeEpoch;
+        this.tripStartTime = tripStartTime;
+        this.tripEndTime = tripEndTime;
+        this.tripEndTimeEpoch = tripEndTimeEpoch;
+        this.tripKills = tripKills;
+        this.tripValue = tripValue;
     }
 
     public void addNpcAggregateToTrip(NpcLootAggregate npcLootAggregate) {
@@ -72,7 +90,8 @@ public class Trip {
     public void setStatus(boolean status) {
         this.tripActive = status;
         if (!tripActive) {
-            this.tripEndTime = formatTime(System.currentTimeMillis());
+            this.tripEndTimeEpoch = System.currentTimeMillis();
+            this.tripEndTime = formatTime(tripEndTimeEpoch);
         }
     }
 
@@ -96,8 +115,16 @@ public class Trip {
         return tripStartTime;
     }
 
+    public long getTripStartTimeEpoch() {
+        return tripStartTimeEpoch;
+    }
+
     public String getTripEndTime() {
         return tripEndTime;
+    }
+
+    public long getTripEndTimeEpoch() {
+        return tripEndTimeEpoch;
     }
 
     public EnhancedLootTrackerPlugin getParentPlugin() {
@@ -105,7 +132,8 @@ public class Trip {
     }
 
     public String calculateTripDuration() {
-        long tripDurationSeconds = (System.currentTimeMillis() - tripStartTimeEpoch) / 1000;
+        long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
+        long tripDurationSeconds = (endTime - tripStartTimeEpoch) / 1000;
 
         long days = tripDurationSeconds / (24 * 3600);
         long hours = (tripDurationSeconds % (24 * 3600)) / 3600;
@@ -126,5 +154,9 @@ public class Trip {
         Date date = new Date(epochMillis);
         Format format = new SimpleDateFormat("HH:mm:ss 'on' MMM d yyyy");
         return format.format(date);
+    }
+
+    public static String formatTimePublic(long epochMillis) {
+        return formatTime(epochMillis);
     }
 }

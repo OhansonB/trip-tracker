@@ -27,6 +27,19 @@ public class TrackableItemDrop {
         totalDropHaValue = 0;
     }
 
+    /**
+     * Constructor for restoring a drop from persisted data with a known timestamp.
+     */
+    TrackableItemDrop(String npcName, int npcCombatLevel, long dropTimeDate) {
+        this.npcName = npcName;
+        this.npcCombatLevel = npcCombatLevel;
+
+        droppedItems = new ArrayList<>();
+        this.dropTimeDate = dropTimeDate;
+        totalDropGeValue = 0;
+        totalDropHaValue = 0;
+    }
+
     void addLootToDrop(TrackableDroppedItem itemToAdd) {
         droppedItems.add(itemToAdd);
         totalDropGeValue += itemToAdd.getTotalGePrice();
