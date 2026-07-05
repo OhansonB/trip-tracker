@@ -28,10 +28,12 @@ import net.runelite.client.game.ItemManager;
 import org.apache.commons.text.WordUtils;
 
 import java.awt.image.BufferedImage;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -77,9 +79,15 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private static final String OTHER_CHEST_LOOTED_MESSAGE = "You steal some loot from the chest.";
 	private static final Pattern LARRAN_CHEST_PATTERN = Pattern.compile("You have opened Larran's (big|small) chest .*");
 	private static final Pattern BIRDHOUSE_PATTERN = Pattern.compile("You dismantle and discard the trap, retrieving .*");
+	private static final int CLOCKWORK_ITEM_ID = 8792;
 	private static final Pattern FARMING_HARVEST_PATTERN = Pattern.compile("You begin to harvest the (.+?)\\.");
 	private static final String CACTUS_PICK_MESSAGE = "You carefully pick a spine from the cactus.";
 	private static final Pattern FARMING_PICK_PATTERN = Pattern.compile("You pick (?:a |an |some )(.+?)\\.");
+
+	// Items to exclude from farming harvest tracking (not actual harvests)
+	private static final Set<Integer> FARMING_EXCLUDED_ITEM_IDS = new HashSet<>(Arrays.asList(
+			6055  // Weeds
+	));
 
 	// Region IDs for location-specific loot
 	private static final int WINTERTODT_REGION = 6461;
@@ -98,6 +106,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private Multiset<Integer> farmingPreHarvestSnapshot;
 	private ScheduledFuture<?> farmingDebounceTimer;
 	private static final long FARMING_DEBOUNCE_TICKS_MS = 4200; // ~7 game ticks to cover the picking animation gap
+	private int lastInventoryChangeTick = -1; // game tick of most recent ItemContainerChanged
+	private int lastFarmingXpTick = -1; // game tick of most recent Farming XP event
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -137,6 +147,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private String lastPickpocketTarget;
 	private Multiset<Integer> inventorySnapshot;
 	private Multiset<Integer> referenceInventorySnapshot;
+	private Multiset<Integer> previousReferenceInventorySnapshot;
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
 	private final List<TrackableItemDrop> listViewDropArray = Collections.synchronizedList(new ArrayList<>());
@@ -251,6 +262,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void onGameStateChanged(GameStateChanged event) {
 		if (event.getGameState() == GameState.LOADING) {
 			chestLooted = false;
+		}
+		if (event.getGameState() == GameState.LOGIN_SCREEN) {
+			// Only reset snapshots when actually logged out, not on world hops or loading
+			referenceInventorySnapshot = null;
+			previousReferenceInventorySnapshot = null;
 		}
 	}
 
@@ -408,7 +424,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Farming harvest detection
 		final Matcher farmingMatcher = FARMING_HARVEST_PATTERN.matcher(message);
-		if (farmingMatcher.matches()) {
+		if (farmingMatcher.matches() && !farmingHarvestInProgress) {
 			String patchType = farmingMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -457,7 +473,17 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (itemContainer != null)
 		{
 			Arrays.stream(itemContainer.getItems())
-					.forEach(item -> multiset.add(item.getId(), item.getQuantity()));
+					.forEach(item -> {
+						int id = item.getId();
+						// Normalize noted items to their unnoted form so diffs aggregate correctly.
+						// In OSRS, noted item IDs are unnoted + 1, and ItemComposition.getNote()
+						// returns the linked note template ID (799) for noted items.
+						ItemComposition comp = itemManager.getItemComposition(id);
+						if (comp.getNote() != -1) {
+							id = comp.getLinkedNoteId();
+						}
+						multiset.add(id, item.getQuantity());
+					});
 		}
 
 		return multiset;
@@ -467,6 +493,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void onItemContainerChanged(ItemContainerChanged event) {
 		// If the change has occurred in the player's inventory
 		if (event.getContainerId() == INVENTORY_CONTAINER_ID) {
+			lastInventoryChangeTick = client.getTickCount();
+
+			// Always capture the current inventory state for reference tracking
+			Multiset<Integer> currentSnapshot = getPlayerInventorySnapshot();
 
 			// pickpocketHasOccurred is set to true as a result of a certain chat message being detected
 			// in onChatMessage
@@ -474,70 +504,54 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				// Set to false to signify that the pickpocketing event has been processed
 				pickpocketHasOccurred = false;
 
-				// Get a snapshot of the players inventory (after the change)
-				inventorySnapshot = getPlayerInventorySnapshot();
+				// If we don't have a reference snapshot yet, just update and skip processing
+				if (referenceInventorySnapshot != null) {
+					// Create a difference between the post-change and pre-change inventory
+					Multiset<Integer> newItems = compareInventorySnapshot(currentSnapshot, referenceInventorySnapshot);
 
-				// If we don't have a reference snapshot yet, skip processing
-				if (referenceInventorySnapshot == null) {
-					referenceInventorySnapshot = inventorySnapshot;
-					return;
-				}
+					// If there's a difference, process the pickpocket loot
+					if (!newItems.isEmpty()) {
+						// Generate a RuneLite List<ItemStack> object from the difference
+						final List<ItemStack> itemStacks = newItems.entrySet().stream()
+								.map(e -> new ItemStack(e.getElement(), e.getCount()))
+								.collect(Collectors.toList());
 
-				// Create a difference between the post-change and pre-change inventory
-				Multiset<Integer> newItems = compareInventorySnapshot(inventorySnapshot, referenceInventorySnapshot);
+						// Create a new itemDrop object
+						TrackableItemDrop itemDrop = new TrackableItemDrop(lastPickpocketTarget, 0);
 
-				// Update the reference snapshot for next time
-				referenceInventorySnapshot = inventorySnapshot;
+						// Look up the average coin value for this NPC's pickpocket
+						int coinValuePerPouch = PICKPOCKET_COIN_VALUES.getOrDefault(lastPickpocketTarget, 1);
 
-				// If there's no difference (e.g., pickpocket was interrupted), skip processing
-				if (newItems.isEmpty()) {
-					return;
-				}
+						for (ItemStack itemStack : itemStacks) {
+							int itemId = itemStack.getId();
+							int itemQuantity = itemStack.getQuantity() > 0 ? itemStack.getQuantity() : 1;
 
-				// Generate a RuneLite List<ItemStack> object from the difference between current and reference
-				// inventory snapshots
-				final List<ItemStack> itemStacks = newItems.entrySet().stream()
-						.map(e -> new ItemStack(e.getElement(), e.getCount()))
-						.collect(Collectors.toList());
+							if (COIN_POUCH_IDS.contains(itemId)) {
+								TrackableDroppedItem pouchItem = new TrackableDroppedItem(
+										itemId,
+										"Coin pouch",
+										itemQuantity,
+										coinValuePerPouch,
+										coinValuePerPouch);
+								itemDrop.addLootToDrop(pouchItem);
+							} else {
+								TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
+								itemDrop.addLootToDrop(newDroppedItem);
+							}
+						}
 
-				// Create a new itemDrop object
-				TrackableItemDrop itemDrop = new TrackableItemDrop(lastPickpocketTarget, 0);
+						// Set lastNpcKilled so trip/grouped views attribute loot to the correct target
+						lastNpcKilled = lastPickpocketTarget;
 
-				// Look up the average coin value for this NPC's pickpocket
-				int coinValuePerPouch = PICKPOCKET_COIN_VALUES.getOrDefault(lastPickpocketTarget, 1);
-
-				// Iterate over itemStacks and create TrackableDroppedItem for each item stack in that list
-				// and add TrackableDroppedItem to TrackableItemDrop
-				for (ItemStack itemStack : itemStacks) {
-					int itemId = itemStack.getId();
-					int itemQuantity = itemStack.getQuantity() > 0 ? itemStack.getQuantity() : 1;
-
-					// Coin pouches have no GE value, so we assign the estimated coin value per pouch
-					if (COIN_POUCH_IDS.contains(itemId)) {
-						TrackableDroppedItem pouchItem = new TrackableDroppedItem(
-								itemId,
-								"Coin pouch",
-								itemQuantity,
-								coinValuePerPouch,
-								coinValuePerPouch);
-						itemDrop.addLootToDrop(pouchItem);
-					} else {
-						TrackableDroppedItem newDroppedItem = buildTrackableItem(itemId, itemQuantity);
-						itemDrop.addLootToDrop(newDroppedItem);
+						// Process TrackableItemDrop (add to UI elements and such)
+						processNewDrop(itemDrop);
 					}
 				}
-
-				// Set lastNpcKilled so trip/grouped views attribute loot to the correct target
-				lastNpcKilled = lastPickpocketTarget;
-
-				// Process TrackableItemDrop (add to UI elements and such)
-				processNewDrop(itemDrop);
 			} else if (awaitingLootDiff) {
 				// Process chat-triggered loot diff
 				awaitingLootDiff = false;
 
-				Multiset<Integer> currentInventory = getPlayerInventorySnapshot();
-				Multiset<Integer> newItems = compareInventorySnapshot(currentInventory, preLootInventorySnapshot);
+				Multiset<Integer> newItems = compareInventorySnapshot(currentSnapshot, preLootInventorySnapshot);
 
 				if (!newItems.isEmpty()) {
 					lastNpcKilled = pendingLootEventName;
@@ -546,6 +560,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
 						int itemId = entry.getElement();
 						int quantity = entry.getCount();
+						// Exclude clockwork from bird house loot (it's returned, not earned)
+						if (itemId == CLOCKWORK_ITEM_ID && "Bird House".equals(pendingLootEventName)) {
+							continue;
+						}
 						if (itemId > -1 && quantity > 0) {
 							TrackableDroppedItem droppedItem = buildTrackableItem(itemId, quantity);
 							lootDrop.addLootToDrop(droppedItem);
@@ -556,13 +574,43 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 						processNewDrop(lootDrop);
 					}
 				}
+			}
 
-				// Also maintain reference snapshot
-				referenceInventorySnapshot = currentInventory;
+			// Always update reference snapshots after every inventory change
+			// On the first change after login, previous will be null — set it to the current
+			// snapshot so that the very next change has a valid baseline to diff against.
+			if (referenceInventorySnapshot == null) {
+				previousReferenceInventorySnapshot = currentSnapshot;
+				debugChat("First inventory load — initializing both snapshots");
 			} else {
-				// No pickpocket in progress — maintain the reference snapshot so we always
-				// have a clean "before" state when a pickpocket does occur
-				referenceInventorySnapshot = getPlayerInventorySnapshot();
+				previousReferenceInventorySnapshot = referenceInventorySnapshot;
+			}
+			referenceInventorySnapshot = currentSnapshot;
+			debugChat("Snapshot updated. prev=" + (previousReferenceInventorySnapshot != null ? previousReferenceInventorySnapshot.size() : "null") 
+					+ " ref=" + (referenceInventorySnapshot != null ? referenceInventorySnapshot.size() : "null")
+					+ " tick=" + client.getTickCount());
+
+			// Check if farming XP fired on this same tick but before this inventory change
+			// (flowers: StatChanged fires before ItemContainerChanged)
+			int currentTick = client.getTickCount();
+			if (!farmingHarvestInProgress && lastFarmingXpTick == currentTick && previousReferenceInventorySnapshot != null) {
+				farmingHarvestInProgress = true;
+				farmingPatchType = "farming patch";
+				farmingStartedFromXp = true;
+				farmingPreHarvestSnapshot = HashMultiset.create(previousReferenceInventorySnapshot);
+				debugChat("Farming harvest started from inventory change (XP was on same tick)");
+
+				// Start the debounce timer
+				synchronized (saveLock) {
+					if (farmingDebounceTimer != null && !farmingDebounceTimer.isDone()) {
+						farmingDebounceTimer.cancel(false);
+					}
+					farmingDebounceTimer = debounceExecutor.schedule(
+							this::completeFarmingHarvest,
+							FARMING_DEBOUNCE_TICKS_MS,
+							TimeUnit.MILLISECONDS
+					);
+				}
 			}
 		}
 	}
@@ -580,13 +628,28 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		debugChat("Farming XP event: total=" + event.getXp() + ", harvestInProgress=" + farmingHarvestInProgress);
 
 		if (!farmingHarvestInProgress) {
-			// No chat trigger fired (e.g., allotments have no harvest message).
-			// Snapshot now — we've already missed the first pick, so we'll add +1 later.
-			farmingHarvestInProgress = true;
-			farmingPatchType = "allotment patch";
-			farmingPreHarvestSnapshot = getPlayerInventorySnapshot();
-			farmingStartedFromXp = true;
-			debugChat("Farming harvest auto-started from XP (no chat trigger)");
+			// No chat trigger fired (e.g., allotments, flowers have no harvest message).
+			// Record that farming XP fired on this tick. ItemContainerChanged may fire
+			// before or after this event on the same tick, so we check both directions:
+			// - If inventory already changed this tick, start tracking now
+			// - If not, record the tick and let ItemContainerChanged start tracking
+			int currentTick = client.getTickCount();
+			lastFarmingXpTick = currentTick;
+
+			if (lastInventoryChangeTick == currentTick && previousReferenceInventorySnapshot != null) {
+				// Inventory change already happened this tick (e.g., allotments where
+				// ItemContainerChanged fires before StatChanged)
+				farmingHarvestInProgress = true;
+				farmingPatchType = "farming patch";
+				farmingStartedFromXp = true;
+				farmingPreHarvestSnapshot = HashMultiset.create(previousReferenceInventorySnapshot);
+				debugChat("Farming harvest auto-started from XP (inventory already changed this tick)");
+			} else {
+				// Inventory change hasn't happened yet this tick (e.g., flowers where
+				// StatChanged fires before ItemContainerChanged). Let onItemContainerChanged handle it.
+				debugChat("Farming XP recorded on tick " + currentTick + ", awaiting same-tick inventory change");
+				return;
+			}
 		}
 
 		// Each XP drop resets the debounce timer — harvest is still in progress
@@ -611,7 +674,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (!farmingHarvestInProgress) {
 			return;
 		}
-		boolean addOneExtra = farmingStartedFromXp;
 		farmingHarvestInProgress = false;
 		farmingStartedFromXp = false;
 
@@ -629,22 +691,31 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				return;
 			}
 
+			// Filter out excluded items (e.g., weeds from raking patches)
+			Multiset<Integer> filteredItems = HashMultiset.create();
+			for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
+				if (!FARMING_EXCLUDED_ITEM_IDS.contains(entry.getElement())) {
+					filteredItems.add(entry.getElement(), entry.getCount());
+				}
+			}
+
+			if (filteredItems.isEmpty()) {
+				debugChat("Farming harvest contained only excluded items (weeds) — skipping");
+				return;
+			}
+
 			String sourceName = WordUtils.capitalize(farmingPatchType);
 			lastNpcKilled = sourceName;
 
 			TrackableItemDrop harvestDrop = new TrackableItemDrop(sourceName, 0);
 
-			for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
+			for (Multiset.Entry<Integer> entry : filteredItems.entrySet()) {
 				int itemId = entry.getElement();
 				int quantity = entry.getCount();
-				// If started from XP (no chat trigger), we missed the first pick — add +1
-				if (addOneExtra) {
-					quantity += 1;
-				}
 				if (itemId > -1 && quantity > 0) {
 					TrackableDroppedItem droppedItem = buildTrackableItem(itemId, quantity);
 					harvestDrop.addLootToDrop(droppedItem);
-					debugChat("  Harvested: " + droppedItem.getItemName() + " x" + quantity + (addOneExtra ? " (+1 compensated)" : ""));
+					debugChat("  Harvested: " + droppedItem.getItemName() + " x" + quantity);
 				}
 			}
 
@@ -1021,9 +1092,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	 */
 	private void debugChat(String message) {
 		if (config.debugMode()) {
+			String timestamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
 			chatMessageManager.queue(QueuedMessage.builder()
 					.type(ChatMessageType.GAMEMESSAGE)
-					.runeLiteFormattedMessage("[Trip Tracker] " + message)
+					.runeLiteFormattedMessage("[Trip Tracker " + timestamp + "] " + message)
 					.build());
 		}
 	}

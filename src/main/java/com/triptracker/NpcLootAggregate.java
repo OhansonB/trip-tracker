@@ -5,9 +5,12 @@ import net.runelite.client.game.ItemManager;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class NpcLootAggregate {
     final String npcName;
@@ -19,6 +22,20 @@ public class NpcLootAggregate {
 
     // O(1) lookup map keyed by item ID for efficient aggregation
     private final LinkedHashMap<Integer, LootAggregation> aggregationMap = new LinkedHashMap<>();
+
+    // Bird nest item IDs — these have different IDs but same display name "Bird nest"
+    // and should be aggregated together by name rather than by ID
+    private static final Set<Integer> BIRD_NEST_IDS = new HashSet<>(Arrays.asList(
+            5070, 5071, 5072,  // egg nests (blue, green, red)
+            5073,              // seed nest
+            5074,              // ring nest
+            5075,              // empty nest
+            22798,             // clue nest (beginner)
+            22800,             // clue nest (easy)
+            22802,             // clue nest (medium)
+            22804,             // clue nest (hard)
+            22806              // clue nest (elite)
+    ));
 
     NpcLootAggregate(String npcName, ItemManager itemManager) {
         this.npcName = npcName;
@@ -40,14 +57,35 @@ public class NpcLootAggregate {
         // Incrementally update the aggregation map with new items (O(n) per drop, not O(n²))
         for (TrackableDroppedItem item : itemDrop.getDroppedItems()) {
             int itemId = item.getItemId();
-            LootAggregation existing = aggregationMap.get(itemId);
-            if (existing != null) {
-                existing.updateItemAggregation(item.getQuantity());
+
+            // Bird nests: aggregate by name since different nest types share the display name
+            if (BIRD_NEST_IDS.contains(itemId)) {
+                String itemName = item.getItemName();
+                LootAggregation existingByName = findAggregationByName(itemName);
+                if (existingByName != null) {
+                    existingByName.updateItemAggregation(item.getQuantity());
+                } else {
+                    LootAggregation newAgg = new LootAggregation(itemId, item.getQuantity(), itemManager);
+                    aggregationMap.put(itemId, newAgg);
+                }
             } else {
-                LootAggregation newAgg = new LootAggregation(itemId, item.getQuantity(), itemManager);
-                aggregationMap.put(itemId, newAgg);
+                LootAggregation existing = aggregationMap.get(itemId);
+                if (existing != null) {
+                    existing.updateItemAggregation(item.getQuantity());
+                } else {
+                    LootAggregation newAgg = new LootAggregation(itemId, item.getQuantity(), itemManager);
+                    aggregationMap.put(itemId, newAgg);
+                }
             }
         }
+
+        // Debug: log aggregation map state
+        StringBuilder sb = new StringBuilder("AggMap for " + npcName + ": ");
+        for (Map.Entry<Integer, LootAggregation> e : aggregationMap.entrySet()) {
+            sb.append(e.getKey()).append("=").append(e.getValue().getItemName())
+              .append("x").append(e.getValue().getQuantity()).append(", ");
+        }
+        System.out.println(sb.toString());
 
         this.lootAggregations = new ArrayList<>(aggregationMap.values());
     }
@@ -72,11 +110,20 @@ public class NpcLootAggregate {
         aggregationMap.clear();
         for (TrackableDroppedItem item : droppedItems) {
             int itemId = item.getItemId();
-            LootAggregation existing = aggregationMap.get(itemId);
-            if (existing != null) {
-                existing.updateItemAggregation(item.getQuantity());
+            if (BIRD_NEST_IDS.contains(itemId)) {
+                LootAggregation existingByName = findAggregationByName(item.getItemName());
+                if (existingByName != null) {
+                    existingByName.updateItemAggregation(item.getQuantity());
+                } else {
+                    aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                }
             } else {
-                aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                LootAggregation existing = aggregationMap.get(itemId);
+                if (existing != null) {
+                    existing.updateItemAggregation(item.getQuantity());
+                } else {
+                    aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                }
             }
         }
         this.lootAggregations = new ArrayList<>(aggregationMap.values());
@@ -86,15 +133,37 @@ public class NpcLootAggregate {
         aggregationMap.clear();
         for (TrackableDroppedItem item : droppedItems) {
             int itemId = item.getItemId();
-            LootAggregation existing = aggregationMap.get(itemId);
-            if (existing != null) {
-                existing.updateItemAggregation(item.getQuantity());
+            if (BIRD_NEST_IDS.contains(itemId)) {
+                LootAggregation existingByName = findAggregationByName(item.getItemName());
+                if (existingByName != null) {
+                    existingByName.updateItemAggregation(item.getQuantity());
+                } else {
+                    aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                }
             } else {
-                aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                LootAggregation existing = aggregationMap.get(itemId);
+                if (existing != null) {
+                    existing.updateItemAggregation(item.getQuantity());
+                } else {
+                    aggregationMap.put(itemId, new LootAggregation(itemId, item.getQuantity(), itemManager));
+                }
             }
         }
         this.lootAggregations = new ArrayList<>(aggregationMap.values());
         return lootAggregations;
+    }
+
+    /**
+     * Finds an existing aggregation entry by item name. Used for bird nests where
+     * multiple item IDs share the same display name and should be merged.
+     */
+    private LootAggregation findAggregationByName(String itemName) {
+        for (LootAggregation agg : aggregationMap.values()) {
+            if (agg.getItemName().equals(itemName)) {
+                return agg;
+            }
+        }
+        return null;
     }
 
     public String getNpcName() {
