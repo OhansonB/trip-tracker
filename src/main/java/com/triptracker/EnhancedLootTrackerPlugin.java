@@ -10,6 +10,7 @@ import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
@@ -76,6 +77,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private static final String OTHER_CHEST_LOOTED_MESSAGE = "You steal some loot from the chest.";
 	private static final Pattern LARRAN_CHEST_PATTERN = Pattern.compile("You have opened Larran's (big|small) chest .*");
 	private static final Pattern BIRDHOUSE_PATTERN = Pattern.compile("You dismantle and discard the trap, retrieving .*");
+	private static final Pattern FARMING_HARVEST_PATTERN = Pattern.compile("You begin to harvest the (.+?)\\.");
+	private static final String CACTUS_PICK_MESSAGE = "You carefully pick a spine from the cactus.";
+	private static final Pattern FARMING_PICK_PATTERN = Pattern.compile("You pick (?:a |an |some )(.+?)\\.");
 
 	// Region IDs for location-specific loot
 	private static final int WINTERTODT_REGION = 6461;
@@ -86,6 +90,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private boolean awaitingLootDiff;
 	private String pendingLootEventName;
 	private Multiset<Integer> preLootInventorySnapshot;
+
+	// Farming harvest tracking state
+	private boolean farmingHarvestInProgress;
+	private boolean farmingStartedFromXp;
+	private String farmingPatchType;
+	private Multiset<Integer> farmingPreHarvestSnapshot;
+	private ScheduledFuture<?> farmingDebounceTimer;
+	private static final long FARMING_DEBOUNCE_TICKS_MS = 4200; // ~7 game ticks to cover the picking animation gap
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -189,6 +201,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 			if (pendingTripSave != null) {
 				pendingTripSave.cancel(false);
+			}
+			if (farmingDebounceTimer != null) {
+				farmingDebounceTimer.cancel(false);
 			}
 		}
 		debounceExecutor.shutdown();
@@ -390,6 +405,37 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		} else if (BIRDHOUSE_PATTERN.matcher(message).matches()) {
 			triggerLootDiff("Bird House");
 		}
+
+		// Farming harvest detection
+		final Matcher farmingMatcher = FARMING_HARVEST_PATTERN.matcher(message);
+		if (farmingMatcher.matches()) {
+			String patchType = farmingMatcher.group(1);
+			farmingHarvestInProgress = true;
+			farmingStartedFromXp = false;
+			farmingPatchType = patchType;
+			farmingPreHarvestSnapshot = getPlayerInventorySnapshot();
+			debugChat("Farming harvest started: " + patchType);
+		}
+
+		// Cactus patch picking — uses a different message than standard harvesting
+		if (message.equals(CACTUS_PICK_MESSAGE) && !farmingHarvestInProgress) {
+			farmingHarvestInProgress = true;
+			farmingStartedFromXp = false;
+			farmingPatchType = "cactus patch";
+			farmingPreHarvestSnapshot = getPlayerInventorySnapshot();
+			debugChat("Farming harvest started: cactus patch");
+		}
+
+		// Fruit tree / bush picking — "You pick a coconut.", "You pick a banana.", etc.
+		final Matcher pickMatcher = FARMING_PICK_PATTERN.matcher(message);
+		if (pickMatcher.matches() && !farmingHarvestInProgress) {
+			String pickedItem = pickMatcher.group(1);
+			farmingHarvestInProgress = true;
+			farmingStartedFromXp = false;
+			farmingPatchType = pickedItem + " tree";
+			farmingPreHarvestSnapshot = getPlayerInventorySnapshot();
+			debugChat("Farming pick started: " + farmingPatchType + " (picked: " + pickedItem + ")");
+		}
 	}
 
 	/**
@@ -523,6 +569,90 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	private Multiset<Integer> compareInventorySnapshot(Multiset<Integer> multiset1, Multiset<Integer> multiset2) {
 		return Multisets.difference(multiset1, multiset2);
+	}
+
+	@Subscribe
+	public void onStatChanged(StatChanged event) {
+		if (event.getSkill() != Skill.FARMING) {
+			return;
+		}
+
+		debugChat("Farming XP event: total=" + event.getXp() + ", harvestInProgress=" + farmingHarvestInProgress);
+
+		if (!farmingHarvestInProgress) {
+			// No chat trigger fired (e.g., allotments have no harvest message).
+			// Snapshot now — we've already missed the first pick, so we'll add +1 later.
+			farmingHarvestInProgress = true;
+			farmingPatchType = "allotment patch";
+			farmingPreHarvestSnapshot = getPlayerInventorySnapshot();
+			farmingStartedFromXp = true;
+			debugChat("Farming harvest auto-started from XP (no chat trigger)");
+		}
+
+		// Each XP drop resets the debounce timer — harvest is still in progress
+		synchronized (saveLock) {
+			if (farmingDebounceTimer != null && !farmingDebounceTimer.isDone()) {
+				farmingDebounceTimer.cancel(false);
+				debugChat("Farming debounce timer reset");
+			}
+			farmingDebounceTimer = debounceExecutor.schedule(
+					this::completeFarmingHarvest,
+					FARMING_DEBOUNCE_TICKS_MS,
+					TimeUnit.MILLISECONDS
+			);
+		}
+	}
+
+	/**
+	 * Called when farming XP stops arriving after a harvest started.
+	 * Diffs the inventory and creates a drop record for the harvested produce.
+	 */
+	private void completeFarmingHarvest() {
+		if (!farmingHarvestInProgress) {
+			return;
+		}
+		boolean addOneExtra = farmingStartedFromXp;
+		farmingHarvestInProgress = false;
+		farmingStartedFromXp = false;
+
+		debugChat("Farming debounce fired — completing harvest for: " + farmingPatchType);
+
+		// Must read inventory on the client thread
+		clientThread.invokeLater(() -> {
+			Multiset<Integer> currentInventory = getPlayerInventorySnapshot();
+			Multiset<Integer> newItems = compareInventorySnapshot(currentInventory, farmingPreHarvestSnapshot);
+
+			debugChat("Farming inventory diff: " + newItems.entrySet().size() + " distinct items gained");
+
+			if (newItems.isEmpty()) {
+				debugChat("Farming harvest completed but no new items detected");
+				return;
+			}
+
+			String sourceName = WordUtils.capitalize(farmingPatchType);
+			lastNpcKilled = sourceName;
+
+			TrackableItemDrop harvestDrop = new TrackableItemDrop(sourceName, 0);
+
+			for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
+				int itemId = entry.getElement();
+				int quantity = entry.getCount();
+				// If started from XP (no chat trigger), we missed the first pick — add +1
+				if (addOneExtra) {
+					quantity += 1;
+				}
+				if (itemId > -1 && quantity > 0) {
+					TrackableDroppedItem droppedItem = buildTrackableItem(itemId, quantity);
+					harvestDrop.addLootToDrop(droppedItem);
+					debugChat("  Harvested: " + droppedItem.getItemName() + " x" + quantity + (addOneExtra ? " (+1 compensated)" : ""));
+				}
+			}
+
+			if (!harvestDrop.getDroppedItems().isEmpty()) {
+				debugChat("Farming harvest recorded: " + sourceName + " - " + harvestDrop.getDroppedItems().size() + " item types, value=" + harvestDrop.getTotalDropGeValue());
+				processNewDrop(harvestDrop);
+			}
+		});
 	}
 
 
