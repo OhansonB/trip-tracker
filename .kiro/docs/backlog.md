@@ -43,6 +43,10 @@ Accessed via right-click → "Details" on a trip header.
 
 ![alt text](image.png)
 
+Also affects herb patches and such
+
+![alt text](image-1.png)
+
 ### 10. Exclude certain items / monsters from drops and trips
 
 ### 11. In Trip view, order within trip by value of NPC rather than by last killed
@@ -50,6 +54,8 @@ Accessed via right-click → "Details" on a trip header.
 ### 12. Export pretty print for e.g., Discord
 
 ### 13. Character-specific tracking
+
+### 14. Exclude Clockwork from drop when collecting bird boxes
 
 ## Priority Suggestion
 
