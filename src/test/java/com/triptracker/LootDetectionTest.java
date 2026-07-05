@@ -47,6 +47,8 @@ public class LootDetectionTest {
         when(mockItemManager.getItemPrice(anyInt())).thenReturn(10);
         when(mockComposition.getMembersName()).thenReturn("Test Item");
         when(mockComposition.getHaPrice()).thenReturn(5);
+        when(mockComposition.getNote()).thenReturn(-1);
+        when(mockComposition.getLinkedNoteId()).thenReturn(-1);
 
         // Set up panel mock
         when(mockPanel.getSelectedTrackingMode()).thenReturn(0);

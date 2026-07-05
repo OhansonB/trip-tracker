@@ -89,6 +89,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			6055  // Weeds
 	));
 
+	// Varbit ID for Chambers of Xeric raid state (1 = inside raid)
+	private static final int IN_RAID_VARBIT = 5432;
+
 	// Region IDs for location-specific loot
 	private static final int WINTERTODT_REGION = 6461;
 	private static final int TEMPOROSS_REGION = 12588;
@@ -106,8 +109,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private Multiset<Integer> farmingPreHarvestSnapshot;
 	private ScheduledFuture<?> farmingDebounceTimer;
 	private static final long FARMING_DEBOUNCE_TICKS_MS = 4200; // ~7 game ticks to cover the picking animation gap
+	private static final long FARMING_LEVELUP_DEBOUNCE_MS = 10000; // extended debounce for level-up animation
 	private int lastInventoryChangeTick = -1; // game tick of most recent ItemContainerChanged
 	private int lastFarmingXpTick = -1; // game tick of most recent Farming XP event
+	private int lastKnownFarmingLevel = -1; // track farming level to detect level-ups mid-harvest
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -424,7 +429,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Farming harvest detection
 		final Matcher farmingMatcher = FARMING_HARVEST_PATTERN.matcher(message);
-		if (farmingMatcher.matches() && !farmingHarvestInProgress) {
+		if (farmingMatcher.matches() && !farmingHarvestInProgress && !isInsideChambers()) {
 			String patchType = farmingMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -619,9 +624,21 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return Multisets.difference(multiset1, multiset2);
 	}
 
+	/**
+	 * Returns true if the player is currently inside the Chambers of Xeric raid.
+	 */
+	private boolean isInsideChambers() {
+		return client.getVarbitValue(IN_RAID_VARBIT) == 1;
+	}
+
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
 		if (event.getSkill() != Skill.FARMING) {
+			return;
+		}
+
+		// Skip farming tracking entirely inside Chambers of Xeric
+		if (isInsideChambers()) {
 			return;
 		}
 
@@ -658,9 +675,20 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				farmingDebounceTimer.cancel(false);
 				debugChat("Farming debounce timer reset");
 			}
+
+			// Detect level-up: if the level increased, use a longer debounce ONCE
+			// to bridge the level-up animation pause. Subsequent XP ticks revert to normal.
+			long debounceMs = FARMING_DEBOUNCE_TICKS_MS;
+			int currentLevel = event.getLevel();
+			if (lastKnownFarmingLevel > 0 && currentLevel > lastKnownFarmingLevel) {
+				debounceMs = FARMING_LEVELUP_DEBOUNCE_MS;
+				debugChat("Farming level-up detected (" + lastKnownFarmingLevel + " -> " + currentLevel + "), using extended debounce");
+			}
+			lastKnownFarmingLevel = currentLevel;
+
 			farmingDebounceTimer = debounceExecutor.schedule(
 					this::completeFarmingHarvest,
-					FARMING_DEBOUNCE_TICKS_MS,
+					debounceMs,
 					TimeUnit.MILLISECONDS
 			);
 		}

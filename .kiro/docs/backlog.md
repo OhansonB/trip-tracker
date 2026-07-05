@@ -72,11 +72,11 @@ Separate data files per character so that e.g., an ironman and a main account do
 
 ### 14. ~~Exclude Clockwork from drop when collecting bird boxes~~ ✅ Done
 
-### 15. Farming: level-up mid-harvest causes partial tracking
-When a player levels up mid-harvest (e.g., during herb picking), the level-up event likely triggers an `ItemContainerChanged` that disrupts the snapshot chain. Only herbs received after the level-up are tracked; those before it are lost. Needs investigation into what events fire during a level-up and how they interact with the farming debounce/snapshot logic.
+### 15. ~~Farming: level-up mid-harvest causes partial tracking~~ ⚠️ Fix applied, pending verification
+Fixed by detecting farming level-ups during an active harvest and extending the debounce timer to 10 seconds to bridge the level-up animation pause. However, the root cause hasn't been conclusively confirmed — it may be a debounce timeout issue or a snapshot overwrite. Debug timestamps will clarify on next level-up.
 
-### 16. Disable farming tracking inside Chambers of Xeric (CoX)
-Farming tracking fires correctly inside CoX (herb patches in the raid), but the herbs grown there have no GE value and are not real loot — they're consumables used within the raid. Farming tracking should be entirely disabled when the player is inside CoX (not just hidden, but not tracked at all, like weeds). Detect via region ID or raid state and skip all farming harvest logic while inside.
+### 16. ~~Disable farming tracking inside Chambers of Xeric (CoX)~~ ✅ Done
+Farming tracking is skipped entirely when `client.getVarbitValue(5432) == 1` (player is inside CoX). Both chat triggers and XP fallback are gated.
 
 ---
 
