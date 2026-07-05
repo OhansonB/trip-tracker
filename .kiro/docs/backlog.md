@@ -44,19 +44,39 @@ Accessed via right-click → "Details" on a trip header.
 Fixed by normalizing noted item IDs to unnoted form in inventory snapshots, and merging bird nest variants by display name.
 
 ### 10. Exclude certain items / monsters from drops and trips
+**Behaviour:** This is a visibility filter, not a hard exclude. All data is still tracked and persisted, but hidden items/monsters are filtered from the UI.
+
+- **Item exclusion:** Global "never show this item" list (e.g., ashes, bones). Configured via a text list in plugin settings. Items matching the list are hidden from all views but still saved to disk.
+- **Monster exclusion:** Global "never show drops from this NPC" list. Drops from excluded NPCs are hidden from all views but still persisted.
+- **Reversible:** If a user removes an item/monster from the exclusion list, previously hidden data reappears in the UI immediately (no data loss).
+- **Show hidden toggle:** A global "Show hidden" button in the panel that temporarily reveals all excluded items/monsters, allowing users to see the full picture when needed.
 
 ### 11. In Trip view, order within trip by value of NPC rather than by last killed
+Within a trip, NPC loot boxes should be sorted by total GP value contributed (highest value source at top), not by recency of kill. This makes it easy to see which source was most profitable during the trip at a glance.
 
 ### 12. Export pretty print for e.g., Discord
+Extension of the existing trip comparison export (CSV/JSON). Adds a plain text export format suitable for pasting into Discord, Notepad, etc.
+
+- **Scope:** Trip view only — exports the selected trips from the comparison view.
+- **Format:** Plain text, monospace-friendly. No markdown or embed formatting needed.
+- **Content per trip:** Trip name, kills, duration (formatted as e.g., "1h 30m 29s"), total value, GP/hr, GP/kill. No start/end timestamps.
+- **Copied to clipboard** like the existing CSV/JSON exports.
 
 ### 13. Character-specific tracking
+Separate data files per character so that e.g., an ironman and a main account don't contaminate each other's tracking history.
+
+- **Storage:** Each character gets its own `drops.json` and `trips.json` in a character-specific subdirectory (e.g., `~/.runelite/trip-tracker/<character-id>/`).
+- **Identification:** Ideally use an underlying account UUID if one is accessible via the RuneLite API or Jagex launcher integration. If no stable ID exists, fall back to player display name but handle name changes gracefully (e.g., store a mapping of name → ID, or prompt the user to merge when a name change is detected).
+- **Switching:** On login, automatically load the correct character's data. No manual switching required.
+- **Research needed:** Investigate whether `client.getAccountHash()` or similar provides a stable per-character identifier that survives name changes.
 
 ### 14. ~~Exclude Clockwork from drop when collecting bird boxes~~ ✅ Done
 
 ### 15. Farming: level-up mid-harvest causes partial tracking
 When a player levels up mid-harvest (e.g., during herb picking), the level-up event likely triggers an `ItemContainerChanged` that disrupts the snapshot chain. Only herbs received after the level-up are tracked; those before it are lost. Needs investigation into what events fire during a level-up and how they interact with the farming debounce/snapshot logic.
 
-### 16. Exclude herbs picked while in Chamber of Xeric
+### 16. Disable farming tracking inside Chambers of Xeric (CoX)
+Farming tracking fires correctly inside CoX (herb patches in the raid), but the herbs grown there have no GE value and are not real loot — they're consumables used within the raid. Farming tracking should be entirely disabled when the player is inside CoX (not just hidden, but not tracked at all, like weeds). Detect via region ID or raid state and skip all farming harvest logic while inside.
 
 ---
 
@@ -214,11 +234,17 @@ When a player levels up mid-harvest (e.g., during herb picking), the level-up ev
 
 | # | Feature | Impact | Effort | Suggested Order |
 |---|---------|--------|--------|-----------------|
-| 2 | Schema version | Safety | Low | First (before any model changes) |
-| 3 | Trip persistence | QoL | Medium | Second (common pain point) |
-| 1 | Item sprites | Visual | High | Third (big UI uplift) |
-| 6 | Item highlighting | Visual | Low | Fourth (quick win) |
-| 4 | NPC filter | QoL | Low | Fifth (quick win) |
-| 5 | Trip filter | QoL | Low | Sixth (quick win) |
-| 8 | Trip stats page | Feature | Medium | Seventh |
-| 7 | Damage/prayer | Feature | High | Last (new data model, new events) |
+| 16 | Disable farming in CoX | Bug fix | Low | 1st — prevents bad data being tracked now |
+| 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue |
+| 2 | Schema version | Safety | Low | 3rd — safety net before any model changes |
+| 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination |
+| 3 | Trip persistence | QoL | Medium | 5th — common pain point |
+| 11 | Trip sort by value | QoL | Low | 6th — quick win, better readability |
+| 6 | Item highlighting | Visual | Low | 7th — quick win |
+| 4 | NPC filter | QoL | Low | 8th — quick win |
+| 5 | Trip filter | QoL | Low | 9th — quick win |
+| 12 | Discord export | QoL | Low | 10th — quick win, extends existing export |
+| 10 | Item/monster exclusion | QoL | Medium | 11th — UI + config work |
+| 1 | Item sprites | Visual | High | 12th — big UI uplift |
+| 8 | Trip stats page | Feature | Medium | 13th — nice to have |
+| 7 | Damage/prayer | Feature | High | Last — new data model, new events |
