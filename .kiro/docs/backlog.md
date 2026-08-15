@@ -78,15 +78,16 @@ Fixed by detecting farming level-ups during an active harvest and extending the 
 ### 16. ~~Disable farming tracking inside Chambers of Xeric (CoX)~~ ✅ Done
 Farming tracking is skipped entirely when `client.getVarbitValue(5432) == 1` (player is inside CoX). Both chat triggers and XP fallback are gated.
 
-### 17. Exclude Clockwork from all bird house drops, not just trip view.
+### 17. ~~Exclude Clockwork from all bird house drops, not just trip view.~~ ✅ Done
+Verified — clockwork is excluded at drop creation time in the inventory diff path, which feeds all views.
 
-### 18. When farming, exclude all item additions derived from snapshot except the herb in question.
-Used Crystal Teleport Seed before debounce completed and it counted the reduced count item as loot.
+### 18. ~~When farming, exclude all item additions derived from snapshot except the herb in question.~~ ✅ Done
+Added all Crystal Teleport Seed charge variants (IDs 6099-6103, 23959, 23968) to `FARMING_EXCLUDED_ITEM_IDS` so using a teleport crystal during the debounce window no longer pollutes the harvest diff.
 
 ### 19. Add collapse and expand all button on every view (list, group, trip)
 
-### 20. Add persistence to collapsed and expanded items
-When a given panel is re-drawn the collapsed/expanded state is reset and the panel is drawn in the expanded state.
+### 20. ~~Add persistence to collapsed and expanded items~~ ✅ Done
+Collapse state is now persisted for all views: trips via `trips.json`, list drops via `drops.json`, grouped NPCs via `collapsed-npcs.json`.
 
 ---
 
