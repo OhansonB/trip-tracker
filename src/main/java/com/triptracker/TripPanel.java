@@ -4,14 +4,26 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 
 /**
  * Swing UI panel for displaying and controlling a Trip.
  * Separated from the Trip data model for clean architecture.
  */
 public class TripPanel {
+    private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
+    private static final Border DEFAULT_HEADER_BORDER = new EmptyBorder(5, 7, 5, 7);
+    private static final Border FOCUS_HEADER_BORDER = new CompoundBorder(
+            new LineBorder(FOCUS_COLOR, 2),
+            new EmptyBorder(3, 5, 3, 5)
+    );
+
     private final Trip trip;
     private final JLabel statusLabel = new JLabel();
     private JLabel statsLabel;
@@ -85,6 +97,19 @@ public class TripPanel {
         headerPanel.getAccessibleContext().setAccessibleName(trip.getTripName() + " trip panel");
         headerPanel.getAccessibleContext().setAccessibleDescription(
                 "Collapsible trip panel. Press Enter or Space to toggle, right-click for options.");
+        headerPanel.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                headerPanel.setBorder(FOCUS_HEADER_BORDER);
+                headerPanel.repaint();
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                headerPanel.setBorder(DEFAULT_HEADER_BORDER);
+                headerPanel.repaint();
+            }
+        });
 
         // Keyboard listener for collapse/expand and context menu
         headerPanel.addKeyListener(new java.awt.event.KeyAdapter() {
