@@ -77,17 +77,24 @@ public class TripPanel {
         contentPanel.add(statusLabel);
         headerPanel.add(contentPanel, BorderLayout.CENTER);
 
-        // Right-click context menu on the entire header — rebuilt dynamically each time
-        // so that Stop/Delete reflects the current trip status
-        headerPanel.setComponentPopupMenu(new JPopupMenu() {
-            @Override
-            public void show(Component invoker, int x, int y) {
-                removeAll();
-                JPopupMenu fresh = buildContextMenu();
-                for (Component item : fresh.getComponents()) {
-                    add(item);
+        // Right-click context menu on the entire header
+        headerPanel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                if (evt.isPopupTrigger()) {
+                    showContextMenu(evt.getX(), evt.getY());
                 }
-                super.show(invoker, x, y);
+            }
+
+            public void mouseReleased(java.awt.event.MouseEvent evt) {
+                if (evt.isPopupTrigger()) {
+                    showContextMenu(evt.getX(), evt.getY());
+                }
+            }
+
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getButton() == java.awt.event.MouseEvent.BUTTON1) {
+                    toggleCollapse();
+                }
             }
         });
         headerPanel.setToolTipText("Right-click for options, click to collapse");
@@ -96,7 +103,7 @@ public class TripPanel {
         headerPanel.setFocusable(true);
         headerPanel.getAccessibleContext().setAccessibleName(trip.getTripName() + " trip panel");
         headerPanel.getAccessibleContext().setAccessibleDescription(
-                "Collapsible trip panel. Press Enter or Space to toggle, right-click for options.");
+                "Collapsible trip panel. Press Enter or Space to toggle, Shift+F10 for options.");
         headerPanel.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
@@ -118,20 +125,10 @@ public class TripPanel {
                 if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
                         || e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE) {
                     toggleCollapse();
+                    e.consume();
                 } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_F10 && e.isShiftDown()) {
-                    JPopupMenu popup = headerPanel.getComponentPopupMenu();
-                    if (popup != null) {
-                        popup.show(headerPanel, 0, headerPanel.getHeight());
-                    }
-                }
-            }
-        });
-
-        // Left-click to collapse/expand the loot panel
-        headerPanel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                if (evt.getButton() == java.awt.event.MouseEvent.BUTTON1) {
-                    toggleCollapse();
+                    e.consume();
+                    showContextMenu(0, headerPanel.getHeight());
                 }
             }
         });
@@ -184,6 +181,11 @@ public class TripPanel {
         }
 
         return menu;
+    }
+
+    private void showContextMenu(int x, int y) {
+        JPopupMenu menu = buildContextMenu();
+        menu.show(headerPanel, x, y);
     }
 
     public void stopTrip() {
