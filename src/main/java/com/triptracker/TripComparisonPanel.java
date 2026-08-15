@@ -233,9 +233,10 @@ public class TripComparisonPanel extends JPanel {
         container.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
 
         // Trip name
-        JLabel nameLabel = new JLabel(trip.getTripName());
+        JLabel nameLabel = new JLabel(trip.getTripName(), SwingConstants.CENTER);
         nameLabel.setFont(FontManager.getRunescapeSmallFont());
         nameLabel.setForeground(new Color(0xE0, 0x6C, 0x5C));
+        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         container.add(nameLabel);
 
         // Metrics row
