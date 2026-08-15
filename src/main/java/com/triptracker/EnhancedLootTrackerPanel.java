@@ -107,11 +107,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JPanel tripPanel = buildModeButton(tripModeButton, TRIP_MODE_ICON_UNSELECTED,
                 TRIP_MODE_ICON_HOVER, TRIP_MODE_ICON, "Trips", 2);
 
-        ButtonGroup buttonGroup = new ButtonGroup();
-        buttonGroup.add(listModeButton);
-        buttonGroup.add(groupedModeButton);
-        buttonGroup.add(tripModeButton);
-
         listModeButton.setSelected(true);
 
         modeControlsPanel.add(listPanel);
@@ -135,7 +130,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         button.setHorizontalAlignment(SwingConstants.CENTER);
         button.setToolTipText(label + " view");
         button.getAccessibleContext().setAccessibleName(label + " view");
-        button.addActionListener(e -> changeTrackingMode(modeId));
+        button.setFocusable(true);
+        button.addActionListener(e -> {
+            // Manually deselect others since we're not using ButtonGroup
+            listModeButton.setSelected(false);
+            groupedModeButton.setSelected(false);
+            tripModeButton.setSelected(false);
+            button.setSelected(true);
+            changeTrackingMode(modeId);
+        });
         button.addFocusListener(new FocusAdapter() {
             final Border focusBorder = new LineBorder(FOCUS_COLOR, 2);
 
@@ -147,6 +150,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             @Override
             public void focusLost(FocusEvent e) {
                 button.setBorder(null);
+            }
+        });
+        // Allow Enter to activate
+        button.getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "activate");
+        button.getActionMap().put("activate", new AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                button.doClick();
             }
         });
 
