@@ -139,17 +139,18 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             button.setSelected(true);
             changeTrackingMode(modeId);
         });
+        // Focus indicator on the wrapper panel since FlatLaf overrides button border rendering
         button.addFocusListener(new FocusAdapter() {
-            final Border focusBorder = new LineBorder(FOCUS_COLOR, 2);
-
             @Override
             public void focusGained(FocusEvent e) {
-                button.setBorder(focusBorder);
+                panel.setBorder(new LineBorder(FOCUS_COLOR, 2));
+                panel.repaint();
             }
 
             @Override
             public void focusLost(FocusEvent e) {
-                button.setBorder(null);
+                panel.setBorder(null);
+                panel.repaint();
             }
         });
         // Allow Enter to activate
