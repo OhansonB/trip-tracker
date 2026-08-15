@@ -7,8 +7,13 @@ import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
 
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -16,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.Set;
 
 public class EnhancedLootTrackerPanel extends PluginPanel {
+    private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
+
     private EnhancedLootTrackerPlugin parentPlugin;
     private JPanel lootBoxPanel;
     private final int DEFAULT_TRACKING_MODE = 0;
@@ -172,6 +179,20 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         addTripButton.setRolloverIcon(ADD_TRIP_TRACKER_ICON_HOVER);
         addTripButton.setToolTipText("Add a new trip tracker");
         addTripButton.getAccessibleContext().setAccessibleName("Add new trip");
+        addTripButton.setFocusable(true);
+        addTripButton.addFocusListener(new FocusAdapter() {
+            final Border focusBorder = new LineBorder(FOCUS_COLOR, 2);
+
+            @Override
+            public void focusGained(FocusEvent e) {
+                addTripButton.setBorder(focusBorder);
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                addTripButton.setBorder(null);
+            }
+        });
 
         if (addTripButton.getActionListeners().length == 0) {
             addTripButton.addActionListener(e -> createNewTrip());
@@ -458,6 +479,23 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         clearButton.setBorder(new EmptyBorder(5, 10, 5, 10));
         clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearButton.setToolTipText("Delete all tracked drops and trips");
+        clearButton.addFocusListener(new FocusAdapter() {
+            final Border defaultBorder = new EmptyBorder(5, 10, 5, 10);
+            final Border focusBorder = new CompoundBorder(
+                    new LineBorder(FOCUS_COLOR, 2),
+                    new EmptyBorder(3, 8, 3, 8)
+            );
+
+            @Override
+            public void focusGained(FocusEvent e) {
+                clearButton.setBorder(focusBorder);
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                clearButton.setBorder(defaultBorder);
+            }
+        });
         clearButton.addActionListener(e -> confirmClearAllData());
         footer.add(clearButton, BorderLayout.CENTER);
 
