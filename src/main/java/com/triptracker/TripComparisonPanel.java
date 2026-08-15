@@ -54,10 +54,10 @@ public class TripComparisonPanel extends JPanel {
         add(backPanel);
 
         // Checklist header + select all / deselect all
-        JPanel checklistHeaderPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
+        JPanel checklistHeaderPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
         checklistHeaderPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         checklistHeaderPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        checklistHeaderPanel.setBorder(new EmptyBorder(0, 0, 4, 0));
+        checklistHeaderPanel.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         JLabel selectLabel = new JLabel("Select trips:");
         selectLabel.setFont(FontManager.getRunescapeSmallFont());
