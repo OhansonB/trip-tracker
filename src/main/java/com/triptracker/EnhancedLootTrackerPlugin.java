@@ -86,7 +86,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	// Items to exclude from farming harvest tracking (not actual harvests)
 	private static final Set<Integer> FARMING_EXCLUDED_ITEM_IDS = new HashSet<>(Arrays.asList(
-			6055  // Weeds
+			6055,  // Weeds
+			6099,  // Teleport crystal (1 charge)
+			6100,  // Teleport crystal (2 charges)
+			6101,  // Teleport crystal (3 charges)
+			6102,  // Teleport crystal (4 charges)
+			6103,  // Crystal teleport seed (uncharged)
+			23959, // Enhanced crystal teleport seed
+			23968  // Eternal teleport crystal
 	));
 
 	// Varbit ID for Chambers of Xeric raid state (1 = inside raid)
