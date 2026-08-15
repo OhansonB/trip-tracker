@@ -595,6 +595,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         // Switch to trip view and rebuild
         selectedTrackingMode = 2;
+        listModeButton.setSelected(false);
+        groupedModeButton.setSelected(false);
         tripModeButton.setSelected(true);
         rebuildLootPanel();
 
