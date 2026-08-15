@@ -5,7 +5,10 @@ import net.runelite.client.ui.FontManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -16,6 +19,8 @@ import java.util.Set;
  * Metrics are column headers, trips are rows.
  */
 public class TripComparisonPanel extends JPanel {
+    private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
+
     private final List<Trip> allTrips;
     private final Set<Integer> selectedTripIds = new HashSet<>();
     private final JPanel tablePanel;
@@ -43,6 +48,7 @@ public class TripComparisonPanel extends JPanel {
         backButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         backButton.getAccessibleContext().setAccessibleName("Back to trips");
         backButton.addActionListener(e -> onBackAction.run());
+        addKeyboardFocusIndicator(backButton);
         backPanel.add(backButton);
         add(backPanel);
 
@@ -70,6 +76,7 @@ public class TripComparisonPanel extends JPanel {
             buildChecklist();
             rebuildTable();
         });
+        addKeyboardFocusIndicator(selectAllButton);
         checklistHeaderPanel.add(selectAllButton);
 
         JLabel separator = new JLabel("|");
@@ -88,6 +95,7 @@ public class TripComparisonPanel extends JPanel {
             buildChecklist();
             rebuildTable();
         });
+        addKeyboardFocusIndicator(deselectAllButton);
         checklistHeaderPanel.add(deselectAllButton);
 
         add(checklistHeaderPanel);
@@ -115,6 +123,7 @@ public class TripComparisonPanel extends JPanel {
         exportCsvButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         exportCsvButton.getAccessibleContext().setAccessibleName("Export comparison as CSV");
         exportCsvButton.addActionListener(e -> exportCsv());
+        addKeyboardFocusIndicator(exportCsvButton);
         exportPanel.add(exportCsvButton);
 
         JLabel exportSep = new JLabel("|");
@@ -129,6 +138,7 @@ public class TripComparisonPanel extends JPanel {
         exportJsonButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         exportJsonButton.getAccessibleContext().setAccessibleName("Export comparison as JSON");
         exportJsonButton.addActionListener(e -> exportJson());
+        addKeyboardFocusIndicator(exportJsonButton);
         exportPanel.add(exportJsonButton);
 
         add(exportPanel);
@@ -160,6 +170,7 @@ public class TripComparisonPanel extends JPanel {
                 }
                 rebuildTable();
             });
+            addKeyboardFocusIndicator(checkBox);
             checklistPanel.add(checkBox);
         }
     }
@@ -323,5 +334,35 @@ public class TripComparisonPanel extends JPanel {
     private String formatIso(long epochMillis) {
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
         return sdf.format(new java.util.Date(epochMillis));
+    }
+
+    /**
+     * Adds a keyboard-only focus indicator (blue border) to a component.
+     * Only shows when focus is gained via keyboard, not mouse click.
+     */
+    private static void addKeyboardFocusIndicator(JComponent component) {
+        component.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                component.putClientProperty("focusedByMouse", Boolean.TRUE);
+            }
+        });
+        component.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (Boolean.TRUE.equals(component.getClientProperty("focusedByMouse"))) {
+                    component.putClientProperty("focusedByMouse", null);
+                    return;
+                }
+                component.setBorder(new LineBorder(FOCUS_COLOR, 1));
+                component.repaint();
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                component.setBorder(null);
+                component.repaint();
+            }
+        });
     }
 }
