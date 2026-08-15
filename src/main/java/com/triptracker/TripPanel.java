@@ -59,7 +59,7 @@ public class TripPanel {
                 trip.calculateTripDuration();
         statsLabel = new JLabel(statsText);
         statsLabel.setFont(FontManager.getRunescapeSmallFont());
-        statsLabel.setForeground(Color.GRAY);
+        statsLabel.setForeground(new Color(0xB0, 0xB0, 0xB0));
         contentPanel.add(statsLabel);
 
         contentPanel.add(statusLabel);
@@ -79,6 +79,28 @@ public class TripPanel {
             }
         });
         headerPanel.setToolTipText("Right-click for options, click to collapse");
+
+        // Make header keyboard-accessible
+        headerPanel.setFocusable(true);
+        headerPanel.getAccessibleContext().setAccessibleName(trip.getTripName() + " trip panel");
+        headerPanel.getAccessibleContext().setAccessibleDescription(
+                "Collapsible trip panel. Press Enter or Space to toggle, right-click for options.");
+
+        // Keyboard listener for collapse/expand and context menu
+        headerPanel.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE) {
+                    toggleCollapse();
+                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_F10 && e.isShiftDown()) {
+                    JPopupMenu popup = headerPanel.getComponentPopupMenu();
+                    if (popup != null) {
+                        popup.show(headerPanel, 0, headerPanel.getHeight());
+                    }
+                }
+            }
+        });
 
         // Left-click to collapse/expand the loot panel
         headerPanel.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -101,7 +123,7 @@ public class TripPanel {
         // Restore persisted collapse state
         if (trip.isCollapsed()) {
             lootPanel.setVisible(false);
-            summaryPanelTitle.setForeground(Color.GRAY);
+            summaryPanelTitle.setForeground(new Color(0xB0, 0xB0, 0xB0));
         }
 
         return outerPanel;
@@ -219,7 +241,7 @@ public class TripPanel {
     private void toggleCollapse() {
         if (lootPanel.isVisible()) {
             lootPanel.setVisible(false);
-            summaryPanelTitle.setForeground(Color.GRAY);
+            summaryPanelTitle.setForeground(new Color(0xB0, 0xB0, 0xB0));
             trip.setCollapsed(true);
         } else {
             lootPanel.setVisible(true);

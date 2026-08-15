@@ -147,6 +147,25 @@ public class LootTrackingPanelBox extends JPanel {
         innerSummaryPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerSummaryPanel.setLayout(new BorderLayout());
         innerSummaryPanel.setBorder(new EmptyBorder(7, 7, 7, 7));
+
+        // Keyboard accessibility for collapse/expand
+        innerSummaryPanel.setFocusable(true);
+        String accessibleName = (boxType == 0)
+                ? itemDrop.getDropNpcName() + " drop panel"
+                : npcName + " loot panel";
+        innerSummaryPanel.getAccessibleContext().setAccessibleName(accessibleName);
+        innerSummaryPanel.getAccessibleContext().setAccessibleDescription(
+                "Collapsible loot panel. Press Enter or Space to toggle.");
+        innerSummaryPanel.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE) {
+                    toggleCollapse();
+                }
+            }
+        });
+
         innerSummaryPanel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -155,6 +174,7 @@ public class LootTrackingPanelBox extends JPanel {
                 }
             }
         });
+        innerSummaryPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
 
         // This label summaries the npc name and level
@@ -190,18 +210,20 @@ public class LootTrackingPanelBox extends JPanel {
         // Restore persisted collapse state
         if (initialCollapsed) {
             dropDetailPanel.setVisible(false);
-            summaryPanelTitle.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
-            dropValueLabel.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+            summaryPanelTitle.setForeground(COLLAPSED_ORANGE);
+            dropValueLabel.setForeground(COLLAPSED_ORANGE);
         }
 
         return outerPanel;
     }
 
+    private static final Color COLLAPSED_ORANGE = new Color(0xCC, 0x88, 0x33);
+
     private void toggleCollapse() {
         if (dropDetailPanel.isVisible()) {
             dropDetailPanel.setVisible(false);
-            summaryPanelTitle.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
-            dropValueLabel.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+            summaryPanelTitle.setForeground(COLLAPSED_ORANGE);
+            dropValueLabel.setForeground(COLLAPSED_ORANGE);
             updateCollapseState(true);
         } else {
             dropDetailPanel.setVisible(true);

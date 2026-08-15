@@ -41,6 +41,7 @@ public class TripComparisonPanel extends JPanel {
         backButton.setContentAreaFilled(false);
         backButton.setBorderPainted(false);
         backButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        backButton.getAccessibleContext().setAccessibleName("Back to trips");
         backButton.addActionListener(e -> onBackAction.run());
         backPanel.add(backButton);
         add(backPanel);
@@ -61,6 +62,7 @@ public class TripComparisonPanel extends JPanel {
         selectAllButton.setContentAreaFilled(false);
         selectAllButton.setBorderPainted(false);
         selectAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        selectAllButton.getAccessibleContext().setAccessibleName("Select all trips");
         selectAllButton.addActionListener(e -> {
             for (Trip trip : allTrips) {
                 selectedTripIds.add(trip.getTripId());
@@ -71,7 +73,7 @@ public class TripComparisonPanel extends JPanel {
         checklistHeaderPanel.add(selectAllButton);
 
         JLabel separator = new JLabel("|");
-        separator.setForeground(Color.GRAY);
+        separator.setForeground(new Color(0xB0, 0xB0, 0xB0));
         checklistHeaderPanel.add(separator);
 
         JButton deselectAllButton = new JButton("None");
@@ -80,6 +82,7 @@ public class TripComparisonPanel extends JPanel {
         deselectAllButton.setContentAreaFilled(false);
         deselectAllButton.setBorderPainted(false);
         deselectAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        deselectAllButton.getAccessibleContext().setAccessibleName("Deselect all trips");
         deselectAllButton.addActionListener(e -> {
             selectedTripIds.clear();
             buildChecklist();
@@ -110,11 +113,12 @@ public class TripComparisonPanel extends JPanel {
         exportCsvButton.setContentAreaFilled(false);
         exportCsvButton.setBorderPainted(false);
         exportCsvButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        exportCsvButton.getAccessibleContext().setAccessibleName("Export comparison as CSV");
         exportCsvButton.addActionListener(e -> exportCsv());
         exportPanel.add(exportCsvButton);
 
         JLabel exportSep = new JLabel("|");
-        exportSep.setForeground(Color.GRAY);
+        exportSep.setForeground(new Color(0xB0, 0xB0, 0xB0));
         exportPanel.add(exportSep);
 
         JButton exportJsonButton = new JButton("Export JSON");
@@ -123,6 +127,7 @@ public class TripComparisonPanel extends JPanel {
         exportJsonButton.setContentAreaFilled(false);
         exportJsonButton.setBorderPainted(false);
         exportJsonButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        exportJsonButton.getAccessibleContext().setAccessibleName("Export comparison as JSON");
         exportJsonButton.addActionListener(e -> exportJson());
         exportPanel.add(exportJsonButton);
 
@@ -172,7 +177,7 @@ public class TripComparisonPanel extends JPanel {
         if (selected.size() < 2) {
             JLabel hint = new JLabel("Select at least 2 trips to compare.");
             hint.setFont(FontManager.getRunescapeSmallFont());
-            hint.setForeground(Color.GRAY);
+            hint.setForeground(new Color(0xB0, 0xB0, 0xB0));
             hint.setBorder(new EmptyBorder(10, 7, 10, 7));
             tablePanel.add(hint);
         } else {
@@ -216,7 +221,7 @@ public class TripComparisonPanel extends JPanel {
         // Trip name
         JLabel nameLabel = new JLabel(trip.getTripName());
         nameLabel.setFont(FontManager.getRunescapeSmallFont());
-        nameLabel.setForeground(new Color(180, 60, 50));
+        nameLabel.setForeground(new Color(0xE0, 0x6C, 0x5C));
         container.add(nameLabel);
 
         // Metrics row

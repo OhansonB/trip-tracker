@@ -126,11 +126,14 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         button.setRolloverIcon(hoverIcon);
         button.setSelectedIcon(selectedIcon);
         button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.setToolTipText(label + " view");
+        button.getAccessibleContext().setAccessibleName(label + " view");
         button.addActionListener(e -> changeTrackingMode(modeId));
 
         JLabel textLabel = new JLabel(label, SwingConstants.CENTER);
         textLabel.setFont(FontManager.getRunescapeSmallFont());
-        textLabel.setForeground(Color.GRAY);
+        textLabel.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        textLabel.setLabelFor(button);
 
         panel.add(button, BorderLayout.CENTER);
         panel.add(textLabel, BorderLayout.SOUTH);
@@ -167,7 +170,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         SwingUtil.removeButtonDecorations(addTripButton);
         addTripButton.setIcon(ADD_TRIP_TRACKER_ICON);
         addTripButton.setRolloverIcon(ADD_TRIP_TRACKER_ICON_HOVER);
-        addTripButton.setToolTipText("Click to add a new trip tracker");
+        addTripButton.setToolTipText("Add a new trip tracker");
+        addTripButton.getAccessibleContext().setAccessibleName("Add new trip");
 
         if (addTripButton.getActionListeners().length == 0) {
             addTripButton.addActionListener(e -> createNewTrip());
@@ -236,7 +240,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JLabel label = new JLabel("<html><center>" + text + "</center></html>", SwingConstants.CENTER);
         label.setFont(FontManager.getRunescapeSmallFont());
-        label.setForeground(Color.GRAY);
+        label.setForeground(new Color(0xB0, 0xB0, 0xB0));
         panel.add(label, BorderLayout.CENTER);
 
         return panel;
@@ -249,7 +253,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(FontManager.getRunescapeSmallFont());
-        label.setForeground(Color.GRAY);
+        label.setForeground(new Color(0xB0, 0xB0, 0xB0));
         panel.add(label, BorderLayout.CENTER);
 
         return panel;
@@ -454,7 +458,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         clearButton.setBorder(new EmptyBorder(5, 10, 5, 10));
         clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearButton.setToolTipText("Delete all tracked drops and trips");
-        clearButton.setFocusPainted(false);
         clearButton.addActionListener(e -> confirmClearAllData());
         footer.add(clearButton, BorderLayout.CENTER);
 
