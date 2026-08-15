@@ -337,8 +337,9 @@ public class TripComparisonPanel extends JPanel {
     }
 
     /**
-     * Adds a keyboard-only focus indicator (blue border) to a component.
+     * Adds a keyboard-only focus indicator (blue outline) to a component.
      * Only shows when focus is gained via keyboard, not mouse click.
+     * Uses a zero-inset border so layout doesn't shift.
      */
     private static void addKeyboardFocusIndicator(JComponent component) {
         component.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -354,14 +355,42 @@ public class TripComparisonPanel extends JPanel {
                     component.putClientProperty("focusedByMouse", null);
                     return;
                 }
-                component.setBorder(new LineBorder(FOCUS_COLOR, 1));
+                component.putClientProperty("showFocusRing", Boolean.TRUE);
                 component.repaint();
             }
 
             @Override
             public void focusLost(FocusEvent e) {
-                component.setBorder(null);
+                component.putClientProperty("showFocusRing", null);
                 component.repaint();
+            }
+        });
+
+        // Paint a focus ring overlay without affecting layout
+        final javax.swing.border.Border originalBorder = component.getBorder();
+        component.setBorder(new javax.swing.border.AbstractBorder() {
+            @Override
+            public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+                if (originalBorder != null) {
+                    originalBorder.paintBorder(c, g, x, y, width, height);
+                }
+                if (Boolean.TRUE.equals(((JComponent) c).getClientProperty("showFocusRing"))) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setColor(FOCUS_COLOR);
+                    g2.setStroke(new BasicStroke(2));
+                    g2.drawRect(x + 1, y + 1, width - 2, height - 2);
+                    g2.dispose();
+                }
+            }
+
+            @Override
+            public Insets getBorderInsets(Component c) {
+                return originalBorder != null ? originalBorder.getBorderInsets(c) : new Insets(0, 0, 0, 0);
+            }
+
+            @Override
+            public boolean isBorderOpaque() {
+                return false;
             }
         });
     }
