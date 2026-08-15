@@ -140,9 +140,20 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             changeTrackingMode(modeId);
         });
         // Focus indicator on the wrapper panel since FlatLaf overrides button border rendering
+        // Only show when focus is gained via keyboard (not mouse click)
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                panel.putClientProperty("focusedByMouse", Boolean.TRUE);
+            }
+        });
         button.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
+                if (Boolean.TRUE.equals(panel.getClientProperty("focusedByMouse"))) {
+                    panel.putClientProperty("focusedByMouse", null);
+                    return;
+                }
                 panel.setBorder(new LineBorder(FOCUS_COLOR, 2));
                 panel.repaint();
             }
