@@ -40,6 +40,7 @@ public class TripComparisonPanel extends JPanel {
         JPanel backPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
         backPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         backPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        backPanel.setBorder(new EmptyBorder(0, 0, 8, 0));
         JButton backButton = new JButton("\u2190 Back to trips");
         backButton.setFont(FontManager.getRunescapeSmallFont());
         backButton.setForeground(Color.LIGHT_GRAY);
@@ -56,6 +57,7 @@ public class TripComparisonPanel extends JPanel {
         JPanel checklistHeaderPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
         checklistHeaderPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         checklistHeaderPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        checklistHeaderPanel.setBorder(new EmptyBorder(0, 0, 4, 0));
 
         JLabel selectLabel = new JLabel("Select trips:");
         selectLabel.setFont(FontManager.getRunescapeSmallFont());
@@ -104,7 +106,7 @@ public class TripComparisonPanel extends JPanel {
         checklistPanel = new JPanel();
         checklistPanel.setLayout(new BoxLayout(checklistPanel, BoxLayout.Y_AXIS));
         checklistPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-        checklistPanel.setBorder(new EmptyBorder(0, 7, 5, 7));
+        checklistPanel.setBorder(new EmptyBorder(0, 7, 10, 7));
         checklistPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         buildChecklist();
         add(checklistPanel);
@@ -113,7 +115,7 @@ public class TripComparisonPanel extends JPanel {
         JPanel exportPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
         exportPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         exportPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        exportPanel.setBorder(new EmptyBorder(0, 4, 8, 0));
+        exportPanel.setBorder(new EmptyBorder(0, 4, 12, 0));
 
         JButton exportCsvButton = new JButton("Export CSV");
         exportCsvButton.setFont(FontManager.getRunescapeSmallFont());
