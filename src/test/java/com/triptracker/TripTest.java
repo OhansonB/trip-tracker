@@ -87,7 +87,7 @@ public class TripTest {
     @Test
     public void testRestoredTripPreservesData() {
         Trip restored = new Trip("TRIP 5", mockPlugin, false,
-                1000000L, "some start", "some end", 2000000L, 10, 5000, 5);
+                1000000L, "some start", "some end", 2000000L, 10, 5000, 5, false);
 
         assertEquals("TRIP 5", restored.getTripName());
         assertFalse(restored.getTripStatus());
@@ -138,7 +138,7 @@ public class TripTest {
         Mockito.when(mockPlugin.getNextTripNumber()).thenReturn(99);
         long startTime = System.currentTimeMillis() - 3600000L; // 1 hour ago
         Trip hourTrip = new Trip("Test", mockPlugin, true,
-                startTime, "start", "n/a", 0L, 5, 100000, 99);
+                startTime, "start", "n/a", 0L, 5, 100000, 99, false);
 
         // 100000gp over 1 hour = ~100000 gp/hr
         long gpPerHour = hourTrip.getGpPerHour();
@@ -152,7 +152,7 @@ public class TripTest {
         long startTime = System.currentTimeMillis() - 7200000L; // 2 hours ago
         long endTime = System.currentTimeMillis() - 3600000L;   // ended 1 hour ago
         Trip stoppedTrip = new Trip("Test", mockPlugin, false,
-                startTime, "start", "end", endTime, 10, 200000, 99);
+                startTime, "start", "end", endTime, 10, 200000, 99, false);
 
         // 200000gp over 1 hour (start to end) = ~200000 gp/hr
         long gpPerHour = stoppedTrip.getGpPerHour();
@@ -197,7 +197,7 @@ public class TripTest {
         long startTime = System.currentTimeMillis() - 60000L; // 60 seconds ago
         long endTime = System.currentTimeMillis() - 30000L;   // ended 30 seconds ago
         Trip stoppedTrip = new Trip("Test", mockPlugin, false,
-                startTime, "start", "end", endTime, 5, 1000, 99);
+                startTime, "start", "end", endTime, 5, 1000, 99, false);
 
         // Duration should be 30 seconds (start to end)
         long duration = stoppedTrip.getDurationSeconds();

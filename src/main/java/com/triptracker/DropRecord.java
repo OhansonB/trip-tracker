@@ -11,6 +11,7 @@ public class DropRecord {
     String npcName;
     int npcCombatLevel;
     long dropTime;
+    boolean collapsed;
     List<ItemRecord> items;
 
     public static DropRecord fromDrop(TrackableItemDrop drop) {
@@ -18,6 +19,7 @@ public class DropRecord {
         record.npcName = drop.getDropNpcName();
         record.npcCombatLevel = drop.getDropNpcLevel();
         record.dropTime = drop.getDropTimeDate();
+        record.collapsed = drop.isCollapsed();
         record.items = new ArrayList<>();
 
         for (TrackableDroppedItem item : drop.getDroppedItems()) {
@@ -40,6 +42,7 @@ public class DropRecord {
                     item.itemId, item.itemName, item.quantity, item.gePrice, item.haPrice);
             drop.addLootToDrop(droppedItem);
         }
+        drop.setCollapsed(collapsed);
         return drop;
     }
 

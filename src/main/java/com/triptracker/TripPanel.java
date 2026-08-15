@@ -17,6 +17,7 @@ public class TripPanel {
     private JLabel statsLabel;
     private JLabel summaryPanelTitle;
     private JPanel lootPanel;
+    private JPanel headerPanel;
     private Timer statsTimer;
 
     public TripPanel(Trip trip) {
@@ -35,7 +36,7 @@ public class TripPanel {
         outerPanel.setLayout(new BorderLayout());
         outerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        final JPanel headerPanel = new JPanel();
+        headerPanel = new JPanel();
         headerPanel.setLayout(new BorderLayout());
         headerPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         headerPanel.setBorder(new EmptyBorder(5, 7, 5, 7));
@@ -64,8 +65,19 @@ public class TripPanel {
         contentPanel.add(statusLabel);
         headerPanel.add(contentPanel, BorderLayout.CENTER);
 
-        // Right-click context menu on the entire header
-        headerPanel.setComponentPopupMenu(buildContextMenu());
+        // Right-click context menu on the entire header — rebuilt dynamically each time
+        // so that Stop/Delete reflects the current trip status
+        headerPanel.setComponentPopupMenu(new JPopupMenu() {
+            @Override
+            public void show(Component invoker, int x, int y) {
+                removeAll();
+                JPopupMenu fresh = buildContextMenu();
+                for (Component item : fresh.getComponents()) {
+                    add(item);
+                }
+                super.show(invoker, x, y);
+            }
+        });
         headerPanel.setToolTipText("Right-click for options, click to collapse");
 
         // Left-click to collapse/expand the loot panel
@@ -85,6 +97,12 @@ public class TripPanel {
         lootPanel = new JPanel();
         lootPanel.setLayout(new BoxLayout(lootPanel, BoxLayout.Y_AXIS));
         outerPanel.add(lootPanel);
+
+        // Restore persisted collapse state
+        if (trip.isCollapsed()) {
+            lootPanel.setVisible(false);
+            summaryPanelTitle.setForeground(Color.GRAY);
+        }
 
         return outerPanel;
     }
@@ -202,10 +220,13 @@ public class TripPanel {
         if (lootPanel.isVisible()) {
             lootPanel.setVisible(false);
             summaryPanelTitle.setForeground(Color.GRAY);
+            trip.setCollapsed(true);
         } else {
             lootPanel.setVisible(true);
             summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+            trip.setCollapsed(false);
         }
+        trip.getParentPlugin().onTripStatusChanged();
     }
 
     public Trip getTrip() {

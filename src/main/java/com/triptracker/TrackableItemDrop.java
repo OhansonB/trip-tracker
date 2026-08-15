@@ -12,6 +12,7 @@ public class TrackableItemDrop {
     private final int npcCombatLevel;
     private long totalDropGeValue;
     private long totalDropHaValue;
+    private boolean collapsed;
 
     TrackableItemDrop(String npcName, int npcCombatLevel) {
         this.npcName = npcName;
@@ -70,5 +71,13 @@ public class TrackableItemDrop {
 
     long getTotalDropHaValue() {
         return totalDropHaValue;
+    }
+
+    boolean isCollapsed() {
+        return collapsed;
+    }
+
+    void setCollapsed(boolean collapsed) {
+        this.collapsed = collapsed;
     }
 }

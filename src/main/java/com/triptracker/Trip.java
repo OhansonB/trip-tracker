@@ -15,6 +15,7 @@ public class Trip {
     private final ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
     private final EnhancedLootTrackerPlugin parentPlugin;
     private boolean tripActive;
+    private boolean collapsed;
     private final String tripStartTime;
     private final long tripStartTimeEpoch;
     private String tripEndTime;
@@ -39,11 +40,12 @@ public class Trip {
      */
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin, boolean tripActive,
          long tripStartTimeEpoch, String tripStartTime, String tripEndTime,
-         long tripEndTimeEpoch, int tripKills, long tripValue, int tripId) {
+         long tripEndTimeEpoch, int tripKills, long tripValue, int tripId, boolean collapsed) {
         this.parentPlugin = parentPlugin;
         this.tripId = tripId;
         this.tripName = tripName;
         this.tripActive = tripActive;
+        this.collapsed = collapsed;
         this.tripStartTimeEpoch = tripStartTimeEpoch;
         this.tripStartTime = tripStartTime;
         this.tripEndTime = tripEndTime;
@@ -104,6 +106,14 @@ public class Trip {
             this.tripEndTimeEpoch = System.currentTimeMillis();
             this.tripEndTime = formatTime(tripEndTimeEpoch);
         }
+    }
+
+    public boolean isCollapsed() {
+        return collapsed;
+    }
+
+    public void setCollapsed(boolean collapsed) {
+        this.collapsed = collapsed;
     }
 
     public int getTripKills() {

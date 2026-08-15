@@ -11,7 +11,9 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Set;
 
 public class EnhancedLootTrackerPanel extends PluginPanel {
     private EnhancedLootTrackerPlugin parentPlugin;
@@ -37,6 +39,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final LinkedHashMap<Integer, TripPanel> tripsMap = new LinkedHashMap<>();
     private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, LinkedHashMap<String, LootTrackingPanelBox>> tripPanelBoxes = new LinkedHashMap<>();
+    private Set<String> collapsedNpcs = new HashSet<>();
 
     static {
         // Tracker mode control icons
@@ -255,6 +258,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     // This method is used for adding a loot box when in list view mode
     public void addLootBox(TrackableItemDrop itemDrop) {
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop);
+        newDropBox.setOnCollapseChanged(() -> parentPlugin.onDropCollapseChanged());
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
@@ -265,7 +269,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
 
-        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime, npcLootAggregate.collapsed, () -> {
+            npcLootAggregate.collapsed = !npcLootAggregate.collapsed;
+            parentPlugin.onTripStatusChanged();
+        });
         JPanel newLootPanel = newDropBox.buildPanelBox();
         newLootPanel.setName(npcName);
 
@@ -311,7 +318,16 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
 
-        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime);
+        boolean isCollapsed = collapsedNpcs.contains(npcName);
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime, isCollapsed, () -> {
+            // Toggle the NPC name in the collapsed set
+            if (collapsedNpcs.contains(npcName)) {
+                collapsedNpcs.remove(npcName);
+            } else {
+                collapsedNpcs.add(npcName);
+            }
+            parentPlugin.onGroupedCollapseChanged();
+        });
         JPanel newLootPanel = newDropBox.buildPanelBox();
 
         if (groupedLootBoxPanels.containsKey(npcName)) {
@@ -341,6 +357,14 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         this.parentPlugin = parentPlugin;
     }
 
+    public void setCollapsedNpcs(Set<String> collapsedNpcs) {
+        this.collapsedNpcs = collapsedNpcs != null ? collapsedNpcs : new HashSet<>();
+    }
+
+    public Set<String> getCollapsedNpcs() {
+        return collapsedNpcs;
+    }
+
     public int getSelectedTrackingMode() { return selectedTrackingMode; }
 
     /**
@@ -363,7 +387,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                     ArrayList<LootAggregation> aggregations = aggregate.getNpcItemAggregations();
 
                     if (aggregations != null) {
-                        LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill);
+                        LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill, aggregate.collapsed, () -> {
+                            aggregate.collapsed = !aggregate.collapsed;
+                            parentPlugin.onTripStatusChanged();
+                        });
                         lootPanels.put(npcName, panelBox);
                     }
                 }
@@ -505,6 +532,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         tripPanelBoxes.clear();
         groupedLootBoxPanels.clear();
         activeTripLootPanels.clear();
+        collapsedNpcs.clear();
         rebuildLootPanel();
     }
 }

@@ -259,8 +259,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		log.debug("Loaded {} drops and {} trips from disk", dropRecords.size(), tripRecords.size());
 
+		// Load collapsed NPC names for the grouped view
+		Set<String> collapsedNpcs = storageService.loadCollapsedNpcs();
+
 		// Rebuild the panel UI on the EDT so the loaded data is displayed
-		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+		SwingUtilities.invokeLater(() -> {
+			panel.setCollapsedNpcs(collapsedNpcs);
+			panel.rebuildAfterLoad();
+		});
 	}
 
 	@Subscribe
@@ -1115,6 +1121,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		scheduleDebouncedTripSave();
 	}
 
+	public void onDropCollapseChanged() {
+		scheduleDebouncedSave();
+	}
+
+	public void onGroupedCollapseChanged() {
+		storageService.saveCollapsedNpcs(panel.getCollapsedNpcs());
+	}
+
 	/**
 	 * Sends a debug message to game chat when debug mode is enabled.
 	 */
@@ -1148,6 +1162,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		storageService.saveDrops(new ArrayList<>());
 		storageService.saveTrips(new ArrayList<>());
+		storageService.saveCollapsedNpcs(new HashSet<>());
 
 		SwingUtilities.invokeLater(() -> panel.rebuildAfterClear());
 	}

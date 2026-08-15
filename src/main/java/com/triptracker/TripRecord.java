@@ -12,6 +12,7 @@ import java.util.List;
 public class TripRecord {
     String tripName;
     boolean tripActive;
+    boolean collapsed;
     long tripStartTimeEpoch;
     String tripStartTime;
     String tripEndTime;
@@ -25,6 +26,7 @@ public class TripRecord {
         TripRecord record = new TripRecord();
         record.tripName = trip.getTripName();
         record.tripActive = trip.getTripStatus();
+        record.collapsed = trip.isCollapsed();
         record.tripStartTimeEpoch = trip.getTripStartTimeEpoch();
         record.tripStartTime = trip.getTripStartTime();
         record.tripEndTime = trip.getTripEndTime();
@@ -39,6 +41,7 @@ public class TripRecord {
             aggRecord.npcName = aggregate.getNpcName();
             aggRecord.numberOfKills = aggregate.getNumberOfKills();
             aggRecord.lastKillTime = aggregate.getLastKillTime();
+            aggRecord.collapsed = aggregate.collapsed;
             aggRecord.items = new ArrayList<>();
 
             for (TrackableDroppedItem item : aggregate.getDroppedItems()) {
@@ -62,7 +65,7 @@ public class TripRecord {
      */
     public Trip toTrip(EnhancedLootTrackerPlugin plugin, ItemManager itemManager) {
         Trip trip = new Trip(tripName, plugin, tripActive, tripStartTimeEpoch,
-                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId);
+                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId, collapsed);
 
         if (npcAggregates == null) {
             return trip;
@@ -91,6 +94,7 @@ public class TripRecord {
             // Restore kill count and last kill time directly
             aggregate.numberOfKills = aggRecord.numberOfKills;
             aggregate.lastKillTime = aggRecord.lastKillTime;
+            aggregate.collapsed = aggRecord.collapsed;
             // Rebuild the aggregation map from the restored items
             aggregate.rebuildAggregationMap();
 
@@ -107,6 +111,7 @@ public class TripRecord {
         String npcName;
         int numberOfKills;
         String lastKillTime;
+        boolean collapsed;
         List<DropRecord.ItemRecord> items;
     }
 }

@@ -18,6 +18,8 @@ public class LootTrackingPanelBox extends JPanel {
     private long totalGeValue;
     private String lastKillTimeFormatted;
     private ArrayList<LootAggregation> lootAggregations;
+    private boolean initialCollapsed;
+    private Runnable onCollapseChanged;
     final JPanel dropDetailPanel = new JPanel();
     final JLabel summaryPanelTitle = new JLabel();
     final JLabel dropValueLabel = new JLabel();
@@ -27,6 +29,7 @@ public class LootTrackingPanelBox extends JPanel {
     LootTrackingPanelBox(TrackableItemDrop itemDrop) {
         this.itemDrop = itemDrop;
         this.boxType = 0;
+        this.initialCollapsed = itemDrop.isCollapsed();
     }
     LootTrackingPanelBox(ArrayList<LootAggregation> lootAggregation, String npcName, int numberOfKills, String lastKillTime) {
         this.lootAggregations = lootAggregation;
@@ -34,6 +37,18 @@ public class LootTrackingPanelBox extends JPanel {
         this.numberOfKills = numberOfKills;
         this.lastKillTimeFormatted = lastKillTime;
         totalGeValue = lootAggregations.stream().mapToLong(LootAggregation::getTotalGePrice).sum();
+
+        this.boxType = 1;
+    }
+
+    LootTrackingPanelBox(ArrayList<LootAggregation> lootAggregation, String npcName, int numberOfKills, String lastKillTime, boolean collapsed, Runnable onCollapseChanged) {
+        this.lootAggregations = lootAggregation;
+        this.npcName = npcName;
+        this.numberOfKills = numberOfKills;
+        this.lastKillTimeFormatted = lastKillTime;
+        totalGeValue = lootAggregations.stream().mapToLong(LootAggregation::getTotalGePrice).sum();
+        this.initialCollapsed = collapsed;
+        this.onCollapseChanged = onCollapseChanged;
 
         this.boxType = 1;
     }
@@ -172,6 +187,13 @@ public class LootTrackingPanelBox extends JPanel {
 
         dropDetailPanel.add(droppedItemsPanel, BorderLayout.SOUTH);
 
+        // Restore persisted collapse state
+        if (initialCollapsed) {
+            dropDetailPanel.setVisible(false);
+            summaryPanelTitle.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+            dropValueLabel.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
+        }
+
         return outerPanel;
     }
 
@@ -180,11 +202,25 @@ public class LootTrackingPanelBox extends JPanel {
             dropDetailPanel.setVisible(false);
             summaryPanelTitle.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
             dropValueLabel.setForeground(ColorScheme.BRAND_ORANGE_TRANSPARENT);
-
+            updateCollapseState(true);
         } else {
             dropDetailPanel.setVisible(true);
             summaryPanelTitle.setForeground(Color.ORANGE);
             dropValueLabel.setForeground(Color.ORANGE);
+            updateCollapseState(false);
         }
+    }
+
+    private void updateCollapseState(boolean collapsed) {
+        if (boxType == 0 && itemDrop != null) {
+            itemDrop.setCollapsed(collapsed);
+        }
+        if (onCollapseChanged != null) {
+            onCollapseChanged.run();
+        }
+    }
+
+    void setOnCollapseChanged(Runnable onCollapseChanged) {
+        this.onCollapseChanged = onCollapseChanged;
     }
 }

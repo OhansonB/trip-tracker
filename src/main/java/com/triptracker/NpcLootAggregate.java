@@ -19,6 +19,7 @@ public class NpcLootAggregate {
     int numberOfKills;
     String lastKillTime;
     ArrayList<LootAggregation> lootAggregations;
+    boolean collapsed;
 
     // O(1) lookup map keyed by item ID for efficient aggregation
     private final LinkedHashMap<Integer, LootAggregation> aggregationMap = new LinkedHashMap<>();

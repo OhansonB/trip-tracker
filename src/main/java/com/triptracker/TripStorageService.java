@@ -12,7 +12,9 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +30,7 @@ public class TripStorageService {
     private static final String PLUGIN_DIR_NAME = "trip-tracker";
     private static final String TRIPS_FILE_NAME = "trips.json";
     private static final String DROPS_FILE_NAME = "drops.json";
+    private static final String COLLAPSED_NPCS_FILE_NAME = "collapsed-npcs.json";
 
     private final Gson gson;
     private final File pluginDir;
@@ -144,6 +147,36 @@ public class TripStorageService {
         } catch (Exception e) {
             log.warn("Failed to parse drop data from disk, starting fresh", e);
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Save the set of collapsed NPC names (for grouped view) to disk asynchronously.
+     */
+    public void saveCollapsedNpcs(Set<String> collapsedNpcs) {
+        Set<String> snapshot = new HashSet<>(collapsedNpcs);
+        writeExecutor.submit(() -> {
+            String json = gson.toJson(snapshot);
+            writeFile(COLLAPSED_NPCS_FILE_NAME, json);
+        });
+    }
+
+    /**
+     * Load the set of collapsed NPC names from disk.
+     */
+    public Set<String> loadCollapsedNpcs() {
+        String json = readFile(COLLAPSED_NPCS_FILE_NAME);
+        if (json == null || json.isEmpty()) {
+            return new HashSet<>();
+        }
+
+        try {
+            Type setType = new TypeToken<HashSet<String>>() {}.getType();
+            Set<String> result = gson.fromJson(json, setType);
+            return result != null ? result : new HashSet<>();
+        } catch (Exception e) {
+            log.warn("Failed to parse collapsed NPC data from disk, starting fresh", e);
+            return new HashSet<>();
         }
     }
 
