@@ -136,6 +136,19 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         button.setToolTipText(label + " view");
         button.getAccessibleContext().setAccessibleName(label + " view");
         button.addActionListener(e -> changeTrackingMode(modeId));
+        button.addFocusListener(new FocusAdapter() {
+            final Border focusBorder = new LineBorder(FOCUS_COLOR, 2);
+
+            @Override
+            public void focusGained(FocusEvent e) {
+                button.setBorder(focusBorder);
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                button.setBorder(null);
+            }
+        });
 
         JLabel textLabel = new JLabel(label, SwingConstants.CENTER);
         textLabel.setFont(FontManager.getRunescapeSmallFont());
