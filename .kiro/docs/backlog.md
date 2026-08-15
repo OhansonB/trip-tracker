@@ -78,6 +78,16 @@ Fixed by detecting farming level-ups during an active harvest and extending the 
 ### 16. ~~Disable farming tracking inside Chambers of Xeric (CoX)~~ ✅ Done
 Farming tracking is skipped entirely when `client.getVarbitValue(5432) == 1` (player is inside CoX). Both chat triggers and XP fallback are gated.
 
+### 17. Exclude Clockwork from all bird house drops, not just trip view.
+
+### 18. When farming, exclude all item additions derived from snapshot except the herb in question.
+Used Crystal Teleport Seed before debounce completed and it counted the reduced count item as loot.
+
+### 19. Add collapse and expand all button on every view (list, group, trip)
+
+### 20. Add persistence to collapsed and expanded items
+When a given panel is re-drawn the collapsed/expanded state is reset and the panel is drawn in the expanded state.
+
 ---
 
 ## Farming Tracking — Manual Test Plan
@@ -232,19 +242,19 @@ Farming tracking is skipped entirely when `client.getVarbitValue(5432) == 1` (pl
 
 ## Priority Suggestion
 
-| # | Feature | Impact | Effort | Suggested Order |
-|---|---------|--------|--------|-----------------|
-| 16 | Disable farming in CoX | Bug fix | Low | 1st — prevents bad data being tracked now |
-| 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue |
-| 2 | Schema version | Safety | Low | 3rd — safety net before any model changes |
-| 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination |
-| 3 | Trip persistence | QoL | Medium | 5th — common pain point |
-| 11 | Trip sort by value | QoL | Low | 6th — quick win, better readability |
-| 6 | Item highlighting | Visual | Low | 7th — quick win |
-| 4 | NPC filter | QoL | Low | 8th — quick win |
-| 5 | Trip filter | QoL | Low | 9th — quick win |
-| 12 | Discord export | QoL | Low | 10th — quick win, extends existing export |
-| 10 | Item/monster exclusion | QoL | Medium | 11th — UI + config work |
-| 1 | Item sprites | Visual | High | 12th — big UI uplift |
-| 8 | Trip stats page | Feature | Medium | 13th — nice to have |
-| 7 | Damage/prayer | Feature | High | Last — new data model, new events |
+| # | Feature | Impact | Effort | Suggested Order | Status |
+|---|---------|--------|--------|-----------------|--------|
+| 16 | Disable farming in CoX | Bug fix | Low | 1st — prevents bad data being tracked now | ✅ Done |
+| 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue | ✅ Done |
+| 2 | Schema version | Safety | Low | 3rd — safety net before any model changes | |
+| 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination | |
+| 3 | Trip persistence | QoL | Medium | 5th — common pain point | |
+| 11 | Trip sort by value | QoL | Low | 6th — quick win, better readability | |
+| 6 | Item highlighting | Visual | Low | 7th — quick win | |
+| 4 | NPC filter | QoL | Low | 8th — quick win | |
+| 5 | Trip filter | QoL | Low | 9th — quick win | |
+| 12 | Discord export | QoL | Low | 10th — quick win, extends existing export | |
+| 10 | Item/monster exclusion | QoL | Medium | 11th — UI + config work | |
+| 1 | Item sprites | Visual | High | 12th — big UI uplift | |
+| 8 | Trip stats page | Feature | Medium | 13th — nice to have | |
+| 7 | Damage/prayer | Feature | High | Last — new data model, new events | |
