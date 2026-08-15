@@ -339,11 +339,21 @@ public class TripComparisonPanel extends JPanel {
         return sdf.format(new java.util.Date(epochMillis));
     }
 
+    private static final javax.swing.border.Border FOCUS_PLACEHOLDER_BORDER = new EmptyBorder(2, 2, 2, 2);
+    private static final javax.swing.border.Border FOCUS_VISIBLE_BORDER = new LineBorder(FOCUS_COLOR, 2);
+
     /**
      * Adds a keyboard-only focus indicator (blue outline) to a component.
      * Only shows when focus is gained via keyboard, not mouse click.
+     * Pre-allocates border space so layout doesn't shift.
      */
     private static void addKeyboardFocusIndicator(JComponent component) {
+        // Pre-allocate the same insets so the component size stays constant
+        if (component instanceof AbstractButton) {
+            ((AbstractButton) component).setBorderPainted(true);
+        }
+        component.setBorder(FOCUS_PLACEHOLDER_BORDER);
+
         component.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
@@ -357,19 +367,13 @@ public class TripComparisonPanel extends JPanel {
                     component.putClientProperty("focusedByMouse", null);
                     return;
                 }
-                if (component instanceof AbstractButton) {
-                    ((AbstractButton) component).setBorderPainted(true);
-                }
-                component.setBorder(new LineBorder(FOCUS_COLOR, 2));
+                component.setBorder(FOCUS_VISIBLE_BORDER);
                 component.repaint();
             }
 
             @Override
             public void focusLost(FocusEvent e) {
-                if (component instanceof AbstractButton) {
-                    ((AbstractButton) component).setBorderPainted(false);
-                }
-                component.setBorder(null);
+                component.setBorder(FOCUS_PLACEHOLDER_BORDER);
                 component.repaint();
             }
         });
