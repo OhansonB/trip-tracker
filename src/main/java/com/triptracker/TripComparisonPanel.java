@@ -163,6 +163,7 @@ public class TripComparisonPanel extends JPanel {
             checkBox.setForeground(Color.LIGHT_GRAY);
             checkBox.setBackground(ColorScheme.DARK_GRAY_COLOR);
             checkBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+            checkBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, checkBox.getPreferredSize().height));
             checkBox.setSelected(selectedTripIds.contains(trip.getTripId()));
             checkBox.addActionListener(e -> {
                 if (checkBox.isSelected()) {
