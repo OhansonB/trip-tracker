@@ -10,6 +10,7 @@ import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.chat.ChatMessageManager;
@@ -83,6 +84,22 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private static final Pattern FARMING_HARVEST_PATTERN = Pattern.compile("You begin to harvest the (.+?)\\.");
 	private static final String CACTUS_PICK_MESSAGE = "You carefully pick a spine from the cactus.";
 	private static final Pattern FARMING_PICK_PATTERN = Pattern.compile("You pick (?:a |an |some )(.+?)\\.");
+
+	// Bird nest item IDs (searchable nests that yield seeds/rings)
+	private static final String BIRD_NEST_EVENT = "Bird nest";
+	private static final Set<Integer> BIRD_NEST_IDS = new HashSet<>(Arrays.asList(
+			5070, 5071, 5072,  // egg nests (red, green, blue)
+			5073,              // seed nest
+			5074,              // ring nest
+			22798,             // clue nest (beginner)
+			22800,             // clue nest (easy)
+			22802,             // clue nest (medium)
+			22804,             // clue nest (hard)
+			22806              // clue nest (elite)
+	));
+
+	// Flag for bird nest search inventory diff
+	private boolean awaitingBirdNestDiff;
 
 	// Items to exclude from farming harvest tracking (not actual harvests)
 	private static final Set<Integer> FARMING_EXCLUDED_ITEM_IDS = new HashSet<>(Arrays.asList(
@@ -597,6 +614,29 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 						processNewDrop(lootDrop);
 					}
 				}
+			} else if (awaitingBirdNestDiff) {
+				// Process bird nest search loot diff
+				awaitingBirdNestDiff = false;
+
+				Multiset<Integer> newItems = compareInventorySnapshot(currentSnapshot, preLootInventorySnapshot);
+
+				if (!newItems.isEmpty()) {
+					lastNpcKilled = BIRD_NEST_EVENT;
+					TrackableItemDrop nestDrop = new TrackableItemDrop(BIRD_NEST_EVENT, 0);
+
+					for (Multiset.Entry<Integer> entry : newItems.entrySet()) {
+						int itemId = entry.getElement();
+						int quantity = entry.getCount();
+						if (itemId > -1 && quantity > 0) {
+							TrackableDroppedItem droppedItem = buildTrackableItem(itemId, quantity);
+							nestDrop.addLootToDrop(droppedItem);
+						}
+					}
+
+					if (!nestDrop.getDroppedItems().isEmpty()) {
+						processNewDrop(nestDrop);
+					}
+				}
 			}
 
 			// Always update reference snapshots after every inventory change
@@ -709,6 +749,19 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					debounceMs,
 					TimeUnit.MILLISECONDS
 			);
+		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event) {
+		// Track bird nest searching: player right-clicks nest → "Search"
+		if (event.getMenuOption() != null && event.getMenuOption().equals("Search")
+				&& BIRD_NEST_IDS.contains(event.getItemId())) {
+			// Snapshot inventory before the search so we can diff after
+			preLootInventorySnapshot = getPlayerInventorySnapshot();
+			awaitingBirdNestDiff = true;
+			pendingLootEventName = BIRD_NEST_EVENT;
+			debugChat("Bird nest search detected, awaiting inventory diff");
 		}
 	}
 
