@@ -15,6 +15,7 @@ public class Trip {
     private final ArrayList<NpcLootAggregate> npcAggregations = new ArrayList<>();
     private final EnhancedLootTrackerPlugin parentPlugin;
     private boolean tripActive;
+    private boolean tripPaused;
     private boolean collapsed;
     private final String tripStartTime;
     private final long tripStartTimeEpoch;
@@ -22,6 +23,8 @@ public class Trip {
     private long tripEndTimeEpoch;
     private int tripKills;
     private long tripValue;
+    private long pausedDurationMs; // accumulated time spent paused (subtracted from duration)
+    private long pausedAtEpoch;    // when the trip was paused (0 if not paused)
 
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin) {
         this.parentPlugin = parentPlugin;
@@ -40,11 +43,13 @@ public class Trip {
      */
     Trip(String tripName, EnhancedLootTrackerPlugin parentPlugin, boolean tripActive,
          long tripStartTimeEpoch, String tripStartTime, String tripEndTime,
-         long tripEndTimeEpoch, int tripKills, long tripValue, int tripId, boolean collapsed) {
+         long tripEndTimeEpoch, int tripKills, long tripValue, int tripId, boolean collapsed,
+         boolean tripPaused, long pausedDurationMs, long pausedAtEpoch) {
         this.parentPlugin = parentPlugin;
         this.tripId = tripId;
         this.tripName = tripName;
         this.tripActive = tripActive;
+        this.tripPaused = tripPaused;
         this.collapsed = collapsed;
         this.tripStartTimeEpoch = tripStartTimeEpoch;
         this.tripStartTime = tripStartTime;
@@ -52,6 +57,8 @@ public class Trip {
         this.tripEndTimeEpoch = tripEndTimeEpoch;
         this.tripKills = tripKills;
         this.tripValue = tripValue;
+        this.pausedDurationMs = pausedDurationMs;
+        this.pausedAtEpoch = pausedAtEpoch;
     }
 
     public void addNpcAggregateToTrip(NpcLootAggregate npcLootAggregate) {
@@ -103,9 +110,44 @@ public class Trip {
     public void setStatus(boolean status) {
         this.tripActive = status;
         if (!tripActive) {
+            this.tripPaused = false;
             this.tripEndTimeEpoch = System.currentTimeMillis();
             this.tripEndTime = formatTime(tripEndTimeEpoch);
+            // If stopped while paused, finalize the paused duration
+            if (pausedAtEpoch > 0) {
+                pausedDurationMs += System.currentTimeMillis() - pausedAtEpoch;
+                pausedAtEpoch = 0;
+            }
         }
+    }
+
+    public boolean isPaused() {
+        return tripPaused;
+    }
+
+    public void pause() {
+        if (tripActive && !tripPaused) {
+            tripPaused = true;
+            pausedAtEpoch = System.currentTimeMillis();
+        }
+    }
+
+    public void resume() {
+        if (tripActive && tripPaused) {
+            tripPaused = false;
+            if (pausedAtEpoch > 0) {
+                pausedDurationMs += System.currentTimeMillis() - pausedAtEpoch;
+                pausedAtEpoch = 0;
+            }
+        }
+    }
+
+    public long getPausedDurationMs() {
+        return pausedDurationMs;
+    }
+
+    public long getPausedAtEpoch() {
+        return pausedAtEpoch;
     }
 
     public boolean isCollapsed() {
@@ -154,7 +196,12 @@ public class Trip {
 
     public String calculateTripDuration() {
         long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
-        long tripDurationSeconds = (endTime - tripStartTimeEpoch) / 1000;
+        long totalPausedMs = pausedDurationMs;
+        // If currently paused, add the ongoing pause duration
+        if (tripPaused && pausedAtEpoch > 0) {
+            totalPausedMs += System.currentTimeMillis() - pausedAtEpoch;
+        }
+        long tripDurationSeconds = Math.max(0, (endTime - tripStartTimeEpoch - totalPausedMs)) / 1000;
 
         long days = tripDurationSeconds / (24 * 3600);
         long hours = (tripDurationSeconds % (24 * 3600)) / 3600;
@@ -172,12 +219,16 @@ public class Trip {
     }
 
     /**
-     * Calculates GP earned per hour based on trip value and duration.
+     * Calculates GP earned per hour based on trip value and active duration (excluding paused time).
      * Returns 0 if the trip has been active for less than 1 second.
      */
     public long getGpPerHour() {
         long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
-        long durationMs = endTime - tripStartTimeEpoch;
+        long totalPausedMs = pausedDurationMs;
+        if (tripPaused && pausedAtEpoch > 0) {
+            totalPausedMs += System.currentTimeMillis() - pausedAtEpoch;
+        }
+        long durationMs = endTime - tripStartTimeEpoch - totalPausedMs;
         if (durationMs <= 0) {
             return 0;
         }
@@ -185,11 +236,15 @@ public class Trip {
     }
 
     /**
-     * Returns the trip duration in seconds.
+     * Returns the trip active duration in seconds (excluding paused time).
      */
     public long getDurationSeconds() {
         long endTime = tripActive ? System.currentTimeMillis() : tripEndTimeEpoch;
-        return (endTime - tripStartTimeEpoch) / 1000;
+        long totalPausedMs = pausedDurationMs;
+        if (tripPaused && pausedAtEpoch > 0) {
+            totalPausedMs += System.currentTimeMillis() - pausedAtEpoch;
+        }
+        return Math.max(0, (endTime - tripStartTimeEpoch - totalPausedMs)) / 1000;
     }
 
     /**

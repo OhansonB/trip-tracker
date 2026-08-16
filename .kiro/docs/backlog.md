@@ -8,11 +8,8 @@ Configurable toggle added to display items as sprite icons in a 5-column grid wi
 ### 2. ~~Schema version for persisted data~~ ✅ Done
 Added versioned file naming (`drops.v1.json`, `trips.v1.json`). Load scans from highest version down to legacy bare arrays. Old files preserved as backups. Steering file updated with migration checklist.
 
-### 3. Trip persistence across client close
-Do not automatically deactivate trips when the client shuts down. A trip may span a relog (e.g., DKs, slayer tasks). Instead:
-- Keep trips active across restarts
-- Add a configurable max inactive time (e.g., 30 minutes). If the client restarts and more than X minutes have passed since the last drop in the trip, auto-stop it.
-- This prevents zombie trips that stay "active" for days after a player forgets about them.
+### 3. ~~Trip persistence across client close~~ ✅ Done
+Active trips persist across restarts and logouts. Configurable inactivity timeout (0–14,400 minutes, default 180) auto-stops forgotten active trips. Paused trips are exempt from inactivity — they survive indefinitely. Pause/resume available via right-click context menu. Drops and kills not recorded while paused. Duration and GP/hr exclude paused time. Trip deletion saves synchronously to prevent data loss.
 
 ### 4. NPC filter in list and grouped view
 Search/filter box at the top of list view and grouped view. Typing filters drops to only show those matching the NPC name. Useful when the list is long and you want to find a specific monster.

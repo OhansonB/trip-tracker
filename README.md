@@ -14,9 +14,13 @@ A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour stats, 
 
 - Create trips to track loot for a specific grinding session
 - Live stats: kills, total GP, GP/hour, and duration (updates in real-time)
-- Right-click trips to rename, stop, compare, or delete
+- Pause trips to freeze the timer and stop recording drops without ending the trip
+- Resume paused trips to continue tracking
+- Right-click trips to rename, pause/resume, stop, compare, or delete
 - Click trip headers to collapse/expand
-- Data persists across client restarts
+- Active trips persist across client restarts and logouts
+- Configurable inactivity timeout auto-stops forgotten active trips (default: 3 hours)
+- Paused trips are exempt from inactivity timeout — they survive indefinitely
 
 ### Trip Comparison
 
@@ -71,7 +75,9 @@ A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour stats, 
 
 - **Max drops to keep** (10–10,000) — oldest drops pruned automatically
 - **Max trips to keep** (5–200) — oldest trips pruned automatically
+- **Trip inactivity timeout** (0–14,400 minutes) — auto-stops active trips after this long offline. 0 = stop immediately on logout. Default: 180 minutes (3 hours). Paused trips are exempt.
 - **Show loot in chat** — posts a GP summary to game chat on each drop
+- **Show items as sprites** — toggles between icon grid and text list display
 - **Clear all data** — button in panel footer with confirmation dialog
 
 ### UI

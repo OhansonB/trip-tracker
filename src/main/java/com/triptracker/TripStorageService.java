@@ -249,6 +249,34 @@ public class TripStorageService {
         }
     }
 
+    // --- Session timestamp ---
+
+    private static final String SESSION_FILE_NAME = "last-session.txt";
+
+    /**
+     * Persist the epoch timestamp of the last logout or shutdown.
+     * Written synchronously since it's called during shutdown and logout.
+     */
+    public void saveLastSessionEpoch(long epochMs) {
+        writeFile(SESSION_FILE_NAME, String.valueOf(epochMs));
+    }
+
+    /**
+     * Load the last session epoch. Returns 0 if not found.
+     */
+    public long loadLastSessionEpoch() {
+        String content = readFile(SESSION_FILE_NAME);
+        if (content == null || content.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(content.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse last session epoch, returning 0");
+            return 0;
+        }
+    }
+
     // --- Collapsed NPCs ---
 
     /**

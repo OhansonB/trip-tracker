@@ -37,8 +37,13 @@ public class TripPanel {
         statusLabel.setBorder(new EmptyBorder(2, 0, 0, 0));
         statusLabel.setFont(FontManager.getRunescapeSmallFont());
         if (trip.getTripStatus()) {
-            statusLabel.setText("(active)");
-            statusLabel.setForeground(Color.GREEN);
+            if (trip.isPaused()) {
+                statusLabel.setText("(paused)");
+                statusLabel.setForeground(Color.YELLOW);
+            } else {
+                statusLabel.setText("(active)");
+                statusLabel.setForeground(Color.GREEN);
+            }
         }
     }
 
@@ -135,7 +140,7 @@ public class TripPanel {
         });
         headerPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        if (trip.getTripStatus()) {
+        if (trip.getTripStatus() && !trip.isPaused()) {
             startStatsTimer();
         }
 
@@ -173,6 +178,16 @@ public class TripPanel {
         menu.add(compareItem);
 
         if (trip.getTripStatus()) {
+            if (trip.isPaused()) {
+                JMenuItem resumeItem = new JMenuItem("Resume trip");
+                resumeItem.addActionListener(e -> resumeTrip());
+                menu.add(resumeItem);
+            } else {
+                JMenuItem pauseItem = new JMenuItem("Pause trip");
+                pauseItem.addActionListener(e -> pauseTrip());
+                menu.add(pauseItem);
+            }
+
             JMenuItem stopItem = new JMenuItem("Stop trip");
             stopItem.addActionListener(e -> stopTrip());
             menu.add(stopItem);
@@ -207,6 +222,28 @@ public class TripPanel {
         }
     }
 
+    public void pauseTrip() {
+        if (trip.getTripStatus() && !trip.isPaused()) {
+            trip.pause();
+            stopStatsTimer();
+            statusLabel.setText("(paused)");
+            statusLabel.setForeground(Color.YELLOW);
+            updateStats();
+            trip.getParentPlugin().onTripStatusChanged();
+        }
+    }
+
+    public void resumeTrip() {
+        if (trip.getTripStatus() && trip.isPaused()) {
+            trip.resume();
+            startStatsTimer();
+            statusLabel.setText("(active)");
+            statusLabel.setForeground(Color.GREEN);
+            updateStats();
+            trip.getParentPlugin().onTripStatusChanged();
+        }
+    }
+
     public void deleteTrip() {
         int selectedOption = JOptionPane.showConfirmDialog(null,
                 "If you delete this trip you will permanently lose its data. Are you sure?",
@@ -224,8 +261,14 @@ public class TripPanel {
             stopStatsTimer();
             statusLabel.setText("");
         } else {
-            statusLabel.setText("(active)");
-            statusLabel.setForeground(Color.GREEN);
+            if (trip.isPaused()) {
+                statusLabel.setText("(paused)");
+                statusLabel.setForeground(Color.YELLOW);
+            } else {
+                statusLabel.setText("(active)");
+                statusLabel.setForeground(Color.GREEN);
+                startStatsTimer();
+            }
         }
     }
 

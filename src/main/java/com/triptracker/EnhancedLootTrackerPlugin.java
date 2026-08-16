@@ -253,6 +253,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		// Persist data synchronously before shutdown, then clean up the executor
 		storageService.saveTripsSync(trips);
 		storageService.saveDropsSync(listViewDropArray);
+		storageService.saveLastSessionEpoch(System.currentTimeMillis());
 		storageService.shutdown();
 
 		clientToolbar.removeNavigation(navButton);
@@ -270,17 +271,23 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			addDropToGroupedAggregates(drop);
 		}
 
-		// Load trips (all restored trips are set to inactive since the session is new)
+		// Load trips — active trips persist across restarts, subject to inactivity timeout
 		List<TripRecord> tripRecords = storageService.loadTrips();
+		long lastSessionEpoch = storageService.loadLastSessionEpoch();
+		long inactivityThresholdMs = config.tripInactivityTimeout() * 60000L;
+		long timeSinceLastSession = (lastSessionEpoch > 0) ? System.currentTimeMillis() - lastSessionEpoch : 0;
+
 		for (TripRecord record : tripRecords) {
-			// If the trip was still active when saved, mark it as ended now
-			if (record.tripActive) {
+			// Auto-stop active trips that exceeded the inactivity timeout
+			if (record.tripActive && !record.tripPaused && lastSessionEpoch > 0
+					&& timeSinceLastSession > inactivityThresholdMs) {
 				record.tripActive = false;
 				if (record.tripEndTime == null || "n/a".equals(record.tripEndTime)) {
-					long endEpoch = System.currentTimeMillis();
-					record.tripEndTime = Trip.formatTime(endEpoch);
-					record.tripEndTimeEpoch = endEpoch;
+					record.tripEndTime = Trip.formatTime(lastSessionEpoch);
+					record.tripEndTimeEpoch = lastSessionEpoch;
 				}
+				log.debug("Auto-stopped trip '{}' due to inactivity ({} ms since last session)",
+						record.tripName, timeSinceLastSession);
 			}
 			Trip trip = record.toTrip(this, itemManager);
 			trips.add(trip);
@@ -307,6 +314,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			// Only reset snapshots when actually logged out, not on world hops or loading
 			referenceInventorySnapshot = null;
 			previousReferenceInventorySnapshot = null;
+			// Record logout time for trip inactivity checks
+			storageService.saveLastSessionEpoch(System.currentTimeMillis());
 		}
 	}
 
@@ -936,6 +945,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private void updateCurrentTripUi() {
 		if (getActiveTrip() != null) {
 			Trip aTrip = getActiveTrip();
+			// Don't update trip UI while paused
+			if (aTrip.isPaused()) {
+				return;
+			}
 			aTrip.incrementKills();
 
 			ArrayList<NpcLootAggregate> tripNpcAggregates = aTrip.getTripAggregates();
@@ -971,6 +984,10 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (getActiveTrip() != null) {
 			Trip trip = getActiveTrip();
+			// Don't record drops while the trip is paused
+			if (trip.isPaused()) {
+				return;
+			}
 			trip.addValue(itemDrop.getTotalDropGeValue());
 
 			String npcName = itemDrop.getDropNpcName();
@@ -1178,8 +1195,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			}
 		}
-		// Persist after trip removal
-		scheduleDebouncedTripSave();
+		// Save immediately — trip deletion is destructive and must not be lost
+		List<Trip> tripsCopy;
+		synchronized (trips) {
+			tripsCopy = new ArrayList<>(trips);
+		}
+		storageService.saveTripsSync(tripsCopy);
 	}
 
 	public void onTripStatusChanged() {

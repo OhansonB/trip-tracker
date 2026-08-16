@@ -12,6 +12,7 @@ import java.util.List;
 public class TripRecord {
     String tripName;
     boolean tripActive;
+    boolean tripPaused;
     boolean collapsed;
     long tripStartTimeEpoch;
     String tripStartTime;
@@ -20,12 +21,15 @@ public class TripRecord {
     int tripKills;
     long tripValue;
     int tripId;
+    long pausedDurationMs;
+    long pausedAtEpoch;
     List<NpcAggregateRecord> npcAggregates;
 
     public static TripRecord fromTrip(Trip trip) {
         TripRecord record = new TripRecord();
         record.tripName = trip.getTripName();
         record.tripActive = trip.getTripStatus();
+        record.tripPaused = trip.isPaused();
         record.collapsed = trip.isCollapsed();
         record.tripStartTimeEpoch = trip.getTripStartTimeEpoch();
         record.tripStartTime = trip.getTripStartTime();
@@ -34,6 +38,8 @@ public class TripRecord {
         record.tripKills = trip.getTripKills();
         record.tripValue = trip.getTripValue();
         record.tripId = trip.getTripId();
+        record.pausedDurationMs = trip.getPausedDurationMs();
+        record.pausedAtEpoch = trip.getPausedAtEpoch();
         record.npcAggregates = new ArrayList<>();
 
         for (NpcLootAggregate aggregate : trip.getTripAggregates()) {
@@ -65,7 +71,8 @@ public class TripRecord {
      */
     public Trip toTrip(EnhancedLootTrackerPlugin plugin, ItemManager itemManager) {
         Trip trip = new Trip(tripName, plugin, tripActive, tripStartTimeEpoch,
-                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId, collapsed);
+                tripStartTime, tripEndTime, tripEndTimeEpoch, tripKills, tripValue, tripId, collapsed,
+                tripPaused, pausedDurationMs, pausedAtEpoch);
 
         if (npcAggregates == null) {
             return trip;

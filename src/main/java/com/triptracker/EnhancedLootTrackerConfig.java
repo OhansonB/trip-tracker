@@ -87,6 +87,19 @@ public interface EnhancedLootTrackerConfig extends Config {
 		return 50;
 	}
 
+	@ConfigItem(
+			position = 2,
+			keyName = "tripInactivityTimeout",
+			name = "Trip inactivity timeout (minutes)",
+			description = "Minutes of inactivity (logged out / client closed) before an active trip is auto-stopped. 0 = stop immediately on logout. Paused trips are exempt. Range: 0–14,400 (10 days).",
+			section = persistenceSection
+	)
+	@Range(min = 0, max = 14400)
+	default int tripInactivityTimeout()
+	{
+		return 180;
+	}
+
 	// --- Debug ---
 
 	@ConfigItem(
