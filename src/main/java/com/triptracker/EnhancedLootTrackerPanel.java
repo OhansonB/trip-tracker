@@ -71,6 +71,12 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         ADD_TRIP_TRACKER_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(addTripTrackerIcon, -180));
     }
 
+    private String filterText = "";
+    private String tripFilterText = "";
+    private JTextField filterField;
+    private JPanel filterPanel;
+    private JTextField tripFilterField;
+
     EnhancedLootTrackerPanel() {
         setBorder(new EmptyBorder(6, 6, 6, 6));
         setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -82,10 +88,139 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         add(layoutPanel, BorderLayout.NORTH);
 
         layoutPanel.add(buildTrackingModeControls());
+        layoutPanel.add(buildFilterPanel());
         layoutPanel.add(buildLootBoxPanel());
 
         // Footer with clear button
         add(buildFooter(), BorderLayout.SOUTH);
+    }
+
+    private JPanel buildFilterPanel() {
+        filterPanel = new JPanel(new BorderLayout());
+        filterPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        filterPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
+
+        filterField = new JTextField();
+        filterField.setFont(FontManager.getRunescapeSmallFont());
+        filterField.setToolTipText("Filter by NPC name");
+        filterField.putClientProperty("JTextField.placeholderText", "Type to filter...");
+        filterField.getAccessibleContext().setAccessibleName("Filter drops by NPC name");
+        filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { onFilterChanged(); }
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { onFilterChanged(); }
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { onFilterChanged(); }
+        });
+
+        // Clear button (X) on the right side
+        JButton clearButton = new JButton("\u2715");
+        clearButton.setFont(FontManager.getRunescapeSmallFont());
+        clearButton.setPreferredSize(new Dimension(20, 20));
+        clearButton.setToolTipText("Clear filter");
+        clearButton.setContentAreaFilled(false);
+        clearButton.setBorderPainted(false);
+        clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearButton.addActionListener(e -> {
+            filterField.setText("");
+        });
+
+        filterPanel.add(filterField, BorderLayout.CENTER);
+        filterPanel.add(clearButton, BorderLayout.EAST);
+
+        return filterPanel;
+    }
+
+    private void onFilterChanged() {
+        filterText = filterField.getText().trim().toLowerCase();
+        // Rebuild loot entries without triggering intermediate paints
+        lootBoxPanel.setIgnoreRepaint(true);
+        rebuildLootPanel();
+        lootBoxPanel.setIgnoreRepaint(false);
+        filterField.requestFocusInWindow();
+    }
+
+    /**
+     * Builds an inline filter field for trip view, placed below the TRIP TRACKERS header.
+     * Shares the same filterText state as the main filter.
+     */
+    private JPanel buildTripFilterPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(0, 0, 4, 0));
+
+        if (tripFilterField == null) {
+            tripFilterField = new JTextField();
+            tripFilterField.setFont(FontManager.getRunescapeSmallFont());
+            tripFilterField.setToolTipText("Filter by trip name");
+            tripFilterField.putClientProperty("JTextField.placeholderText", "Type to filter...");
+            tripFilterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                @Override
+                public void insertUpdate(javax.swing.event.DocumentEvent e) { onTripFilterChanged(); }
+                @Override
+                public void removeUpdate(javax.swing.event.DocumentEvent e) { onTripFilterChanged(); }
+                @Override
+                public void changedUpdate(javax.swing.event.DocumentEvent e) { onTripFilterChanged(); }
+            });
+        }
+
+        JButton clearButton = new JButton("\u2715");
+        clearButton.setFont(FontManager.getRunescapeSmallFont());
+        clearButton.setPreferredSize(new Dimension(20, 20));
+        clearButton.setToolTipText("Clear filter");
+        clearButton.setContentAreaFilled(false);
+        clearButton.setBorderPainted(false);
+        clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearButton.addActionListener(e -> tripFilterField.setText(""));
+
+        panel.add(tripFilterField, BorderLayout.CENTER);
+        panel.add(clearButton, BorderLayout.EAST);
+
+        return panel;
+    }
+
+    private void onTripFilterChanged() {
+        tripFilterText = tripFilterField.getText().trim().toLowerCase();
+        // Only rebuild the trip entries, not the entire panel (avoids flash)
+        rebuildTripEntries();
+        tripFilterField.requestFocusInWindow();
+    }
+
+    /**
+     * Rebuilds only the trip entries below the header and filter, without touching the
+     * trip controls or filter field. Avoids the flash from a full panel rebuild.
+     */
+    private void rebuildTripEntries() {
+        // Remove everything after the first 2 components (trip controls + filter)
+        while (lootBoxPanel.getComponentCount() > 2) {
+            lootBoxPanel.remove(2);
+        }
+
+        if (tripPanelBoxes.isEmpty()) {
+            lootBoxPanel.add(buildEmptyStateLabel("No trips yet \u2014 click + to start one."));
+        } else {
+            // Insert at position 2 (after controls + filter) so each trip pushes previous ones down
+            // This results in newest-first ordering since tripPanelBoxes is insertion-ordered (oldest first)
+            tripPanelBoxes.forEach((tripId, aValue) -> {
+                TripPanel tripPanel = tripsMap.get(tripId);
+                if (tripPanel != null) {
+                    if (!tripFilterText.isEmpty() && !tripPanel.getTrip().getTripName().toLowerCase().contains(tripFilterText)) {
+                        return;
+                    }
+                    lootBoxPanel.add(tripPanel.buildHeaderPanel(), 2);
+                    tripPanelBoxes.get(tripId).forEach((bKey, bValue) -> {
+                        LootTrackingPanelBox panelBox = tripPanelBoxes.get(tripId).get(bKey);
+                        JPanel panel = panelBox.buildPanelBox();
+                        panel.setName(bKey);
+                        tripPanel.addLootPanel(panel);
+                    });
+                }
+            });
+        }
+
+        lootBoxPanel.revalidate();
+        lootBoxPanel.repaint();
     }
 
     private JPanel buildTrackingModeControls() {
@@ -256,32 +391,21 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private void rebuildLootPanel() {
         // Remove all components from lootBoxPanel
         SwingUtil.fastRemoveAll(lootBoxPanel);
-        lootBoxPanel.revalidate();
-        lootBoxPanel.repaint();
+
+        // Show/hide the main filter panel based on mode (trip view uses its own inline filter)
+        if (filterPanel != null) {
+            filterPanel.setVisible(selectedTrackingMode != 2);
+        }
 
         if (selectedTrackingMode == 2) {
             lootBoxPanel.add(buildTripTrackerControls());
 
-            if (tripPanelBoxes.isEmpty()) {
-                // Empty state for trip view
-                lootBoxPanel.add(buildEmptyStateLabel("No trips yet \u2014 click + to start one."));
-            } else {
-                // tripPanels is a map of trip IDs to trip panels associated with that trip
-                tripPanelBoxes.forEach((tripId, aValue) -> {
-                    TripPanel tripPanel = tripsMap.get(tripId);
-                    if (tripPanel != null) {
-                        lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
-                        lootBoxPanel.revalidate();
-                        lootBoxPanel.repaint();
-                        tripPanelBoxes.get(tripId).forEach((bKey, bValue) -> {
-                            LootTrackingPanelBox panelBox = tripPanelBoxes.get(tripId).get(bKey);
-                            JPanel panel = panelBox.buildPanelBox();
-                            panel.setName(bKey);
-                            tripPanel.addLootPanel(panel);
-                        });
-                    }
-                });
-            }
+            // Trip filter sits directly below the header
+            JPanel tripFilter = buildTripFilterPanel();
+            lootBoxPanel.add(tripFilter);
+
+            // Delegate trip entry rendering to shared method
+            rebuildTripEntries();
 
         } else if (selectedTrackingMode == 1) {
             // Grouped view
@@ -299,6 +423,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 parentPlugin.rebuildLootPanel();
             }
         }
+
+        lootBoxPanel.revalidate();
+        lootBoxPanel.repaint();
     }
 
     private JPanel buildEmptyStateLabel(String text) {
@@ -330,6 +457,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     // This method is used for adding a loot box when in list view mode
     public void addLootBox(TrackableItemDrop itemDrop) {
+        // Apply NPC name filter
+        if (!filterText.isEmpty() && !itemDrop.getDropNpcName().toLowerCase().contains(filterText)) {
+            return;
+        }
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         newDropBox.setOnCollapseChanged(() -> parentPlugin.onDropCollapseChanged());
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
@@ -413,6 +544,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         }
 
         if (selectedTrackingMode == 1) {
+            // Apply NPC name filter
+            if (!filterText.isEmpty() && !npcName.toLowerCase().contains(filterText)) {
+                return;
+            }
             lootBoxPanel.add(newLootPanel, 0);
             lootBoxPanel.revalidate();
             lootBoxPanel.repaint();
@@ -489,13 +624,13 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             tripPanelBoxes.put(activeTrip.getTripId(), activeTripLootPanels);
 
             // Remove empty state if present, then add the new trip header without a full rebuild
-            if (lootBoxPanel.getComponentCount() > 1) {
-                Component second = lootBoxPanel.getComponent(1);
-                if (second instanceof JPanel && "emptyState".equals(second.getName())) {
-                    lootBoxPanel.remove(second);
+            if (lootBoxPanel.getComponentCount() > 2) {
+                Component third = lootBoxPanel.getComponent(2);
+                if (third instanceof JPanel && "emptyState".equals(third.getName())) {
+                    lootBoxPanel.remove(third);
                 }
             }
-            lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
+            lootBoxPanel.add(tripPanel.buildHeaderPanel(), 2);
             lootBoxPanel.revalidate();
             lootBoxPanel.repaint();
 
@@ -611,6 +746,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         add(layoutPanel, BorderLayout.NORTH);
 
         layoutPanel.add(buildTrackingModeControls());
+        layoutPanel.add(buildFilterPanel());
         layoutPanel.add(buildLootBoxPanel());
         add(buildFooter(), BorderLayout.SOUTH);
 

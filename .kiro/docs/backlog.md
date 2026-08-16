@@ -11,11 +11,11 @@ Added versioned file naming (`drops.v1.json`, `trips.v1.json`). Load scans from 
 ### 3. ~~Trip persistence across client close~~ ✅ Done
 Active trips persist across restarts and logouts. Configurable inactivity timeout (0–14,400 minutes, default 180) auto-stops forgotten active trips. Paused trips are exempt from inactivity — they survive indefinitely. Pause/resume available via right-click context menu. Drops and kills not recorded while paused. Duration and GP/hr exclude paused time. Trip deletion saves synchronously to prevent data loss.
 
-### 4. NPC filter in list and grouped view
-Search/filter box at the top of list view and grouped view. Typing filters drops to only show those matching the NPC name. Useful when the list is long and you want to find a specific monster.
+### 4. ~~NPC filter in list and grouped view~~ ✅ Done
+Real-time filter text field (substring, case-insensitive) at the top of list and grouped views. Filters drops by NPC name as you type. Clear button (✕) to reset. Persists across mode switches.
 
-### 5. Trip filter in trip view
-Similar to #4 but for trips. Search by trip name to find specific trips when you have many.
+### 5. ~~Trip filter in trip view~~ ✅ Done
+Same filter field in trip view filters by trip title instead of NPC name. Typing "demonic" shows only trips with "demonic" in the name.
 
 ### 6. Configurable item highlighting (text mode)
 When in text-list mode, allow users to configure a GP threshold (e.g., 50k+). Items exceeding that value are highlighted in a different color (e.g., green or gold) to make valuable drops stand out at a glance.
