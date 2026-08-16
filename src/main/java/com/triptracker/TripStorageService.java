@@ -2,6 +2,9 @@ package com.triptracker;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.RuneLite;
@@ -23,14 +26,26 @@ import java.util.concurrent.TimeUnit;
  * Handles reading and writing trip data to disk.
  * Data is stored as JSON in ~/.runelite/trip-tracker/
  * Writes are performed asynchronously on a background thread to avoid blocking the game thread.
+ *
+ * File naming convention:
+ * - v0 (legacy): trips.json, drops.json (bare arrays, no version field)
+ * - v1+: trips.v1.json, drops.v1.json (object envelope with "version" field)
+ *
+ * On load, the highest available version file is used. Old files are never deleted,
+ * serving as backups if a user needs to roll back.
  */
 @Slf4j
 public class TripStorageService {
 
     private static final String PLUGIN_DIR_NAME = "trip-tracker";
-    private static final String TRIPS_FILE_NAME = "trips.json";
-    private static final String DROPS_FILE_NAME = "drops.json";
     private static final String COLLAPSED_NPCS_FILE_NAME = "collapsed-npcs.json";
+
+    // Current schema version — increment when making structural changes to the persisted format
+    static final int CURRENT_VERSION = 1;
+
+    // Base names (without extension) for versioned files
+    private static final String TRIPS_BASE = "trips";
+    private static final String DROPS_BASE = "drops";
 
     private final Gson gson;
     private final File pluginDir;
@@ -54,19 +69,50 @@ public class TripStorageService {
         }
     }
 
+    // --- File naming helpers ---
+
+    /**
+     * Returns the filename for a given base and version.
+     * v0 (legacy) uses "base.json", v1+ uses "base.v{N}.json".
+     */
+    private static String versionedFileName(String base, int version) {
+        if (version == 0) {
+            return base + ".json";
+        }
+        return base + ".v" + version + ".json";
+    }
+
+    /**
+     * Finds the highest version file that exists on disk for the given base name.
+     * Scans from CURRENT_VERSION down to 0. Returns null if no file exists.
+     */
+    private String findHighestVersionFile(String base) {
+        for (int v = CURRENT_VERSION; v >= 0; v--) {
+            String fileName = versionedFileName(base, v);
+            File file = new File(pluginDir, fileName);
+            if (file.exists()) {
+                return fileName;
+            }
+        }
+        return null;
+    }
+
+    // --- Trips ---
+
     /**
      * Save trip data to disk asynchronously.
      */
     public void saveTrips(List<Trip> trips) {
-        // Take a snapshot of the data to avoid concurrent modification
         List<TripRecord> records = new ArrayList<>();
         for (Trip trip : trips) {
             records.add(TripRecord.fromTrip(trip));
         }
 
         writeExecutor.submit(() -> {
-            String json = gson.toJson(records);
-            writeFile(TRIPS_FILE_NAME, json);
+            JsonObject envelope = new JsonObject();
+            envelope.addProperty("version", CURRENT_VERSION);
+            envelope.add("trips", gson.toJsonTree(records));
+            writeFile(versionedFileName(TRIPS_BASE, CURRENT_VERSION), gson.toJson(envelope));
         });
     }
 
@@ -79,42 +125,70 @@ public class TripStorageService {
             records.add(TripRecord.fromTrip(trip));
         }
 
-        String json = gson.toJson(records);
-        writeFile(TRIPS_FILE_NAME, json);
+        JsonObject envelope = new JsonObject();
+        envelope.addProperty("version", CURRENT_VERSION);
+        envelope.add("trips", gson.toJsonTree(records));
+        writeFile(versionedFileName(TRIPS_BASE, CURRENT_VERSION), gson.toJson(envelope));
     }
 
     /**
      * Load trip data from disk.
+     * Scans from highest version down to legacy. Handles bare arrays (v0) and versioned envelopes (v1+).
      */
     public List<TripRecord> loadTrips() {
-        String json = readFile(TRIPS_FILE_NAME);
+        String fileName = findHighestVersionFile(TRIPS_BASE);
+        if (fileName == null) {
+            return new ArrayList<>();
+        }
+
+        String json = readFile(fileName);
         if (json == null || json.isEmpty()) {
             return new ArrayList<>();
         }
 
         try {
+            JsonElement root = gson.fromJson(json, JsonElement.class);
+            JsonArray tripsArray;
+
+            if (root.isJsonObject()) {
+                JsonObject obj = root.getAsJsonObject();
+                int version = obj.has("version") ? obj.get("version").getAsInt() : 0;
+                log.debug("Loading {} (version {})", fileName, version);
+                // Future migrations: if (version < 2) { migrateTripsV1toV2(obj); }
+                tripsArray = obj.has("trips") ? obj.getAsJsonArray("trips") : new JsonArray();
+            } else if (root.isJsonArray()) {
+                log.debug("Loading {} (legacy format, no version)", fileName);
+                tripsArray = root.getAsJsonArray();
+            } else {
+                log.warn("Unexpected format in {}, starting fresh", fileName);
+                return new ArrayList<>();
+            }
+
             Type listType = new TypeToken<ArrayList<TripRecord>>() {}.getType();
-            List<TripRecord> records = gson.fromJson(json, listType);
+            List<TripRecord> records = gson.fromJson(tripsArray, listType);
             return records != null ? records : new ArrayList<>();
         } catch (Exception e) {
-            log.warn("Failed to parse trip data from disk, starting fresh", e);
+            log.warn("Failed to parse trip data from {}, starting fresh", fileName, e);
             return new ArrayList<>();
         }
     }
+
+    // --- Drops ---
 
     /**
      * Save the list-view drop history to disk asynchronously.
      */
     public void saveDrops(List<TrackableItemDrop> drops) {
-        // Take a snapshot of the data to avoid concurrent modification
         List<DropRecord> records = new ArrayList<>();
         for (TrackableItemDrop drop : drops) {
             records.add(DropRecord.fromDrop(drop));
         }
 
         writeExecutor.submit(() -> {
-            String json = gson.toJson(records);
-            writeFile(DROPS_FILE_NAME, json);
+            JsonObject envelope = new JsonObject();
+            envelope.addProperty("version", CURRENT_VERSION);
+            envelope.add("drops", gson.toJsonTree(records));
+            writeFile(versionedFileName(DROPS_BASE, CURRENT_VERSION), gson.toJson(envelope));
         });
     }
 
@@ -127,28 +201,55 @@ public class TripStorageService {
             records.add(DropRecord.fromDrop(drop));
         }
 
-        String json = gson.toJson(records);
-        writeFile(DROPS_FILE_NAME, json);
+        JsonObject envelope = new JsonObject();
+        envelope.addProperty("version", CURRENT_VERSION);
+        envelope.add("drops", gson.toJsonTree(records));
+        writeFile(versionedFileName(DROPS_BASE, CURRENT_VERSION), gson.toJson(envelope));
     }
 
     /**
      * Load the list-view drop history from disk.
+     * Scans from highest version down to legacy. Handles bare arrays (v0) and versioned envelopes (v1+).
      */
     public List<DropRecord> loadDrops() {
-        String json = readFile(DROPS_FILE_NAME);
+        String fileName = findHighestVersionFile(DROPS_BASE);
+        if (fileName == null) {
+            return new ArrayList<>();
+        }
+
+        String json = readFile(fileName);
         if (json == null || json.isEmpty()) {
             return new ArrayList<>();
         }
 
         try {
+            JsonElement root = gson.fromJson(json, JsonElement.class);
+            JsonArray dropsArray;
+
+            if (root.isJsonObject()) {
+                JsonObject obj = root.getAsJsonObject();
+                int version = obj.has("version") ? obj.get("version").getAsInt() : 0;
+                log.debug("Loading {} (version {})", fileName, version);
+                // Future migrations: if (version < 2) { migrateDropsV1toV2(obj); }
+                dropsArray = obj.has("drops") ? obj.getAsJsonArray("drops") : new JsonArray();
+            } else if (root.isJsonArray()) {
+                log.debug("Loading {} (legacy format, no version)", fileName);
+                dropsArray = root.getAsJsonArray();
+            } else {
+                log.warn("Unexpected format in {}, starting fresh", fileName);
+                return new ArrayList<>();
+            }
+
             Type listType = new TypeToken<ArrayList<DropRecord>>() {}.getType();
-            List<DropRecord> records = gson.fromJson(json, listType);
+            List<DropRecord> records = gson.fromJson(dropsArray, listType);
             return records != null ? records : new ArrayList<>();
         } catch (Exception e) {
-            log.warn("Failed to parse drop data from disk, starting fresh", e);
+            log.warn("Failed to parse drop data from {}, starting fresh", fileName, e);
             return new ArrayList<>();
         }
     }
+
+    // --- Collapsed NPCs ---
 
     /**
      * Save the set of collapsed NPC names (for grouped view) to disk asynchronously.
@@ -180,6 +281,8 @@ public class TripStorageService {
         }
     }
 
+    // --- Lifecycle ---
+
     /**
      * Shutdown the write executor, waiting for pending writes to complete.
      */
@@ -195,6 +298,8 @@ public class TripStorageService {
             Thread.currentThread().interrupt();
         }
     }
+
+    // --- File I/O ---
 
     private void writeFile(String fileName, String content) {
         try {

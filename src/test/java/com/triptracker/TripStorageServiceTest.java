@@ -111,12 +111,117 @@ public class TripStorageServiceTest {
 
     @Test
     public void testCorruptFileReturnsEmptyList() throws Exception {
-        // Write garbage to the file
-        File dropsFile = new File(tempDir, "drops.json");
+        // Write garbage to the drops.v1.json file (current version)
+        File dropsFile = new File(tempDir, "drops.v1.json");
         java.nio.file.Files.writeString(dropsFile.toPath(), "this is not valid json {{{");
 
         List<DropRecord> drops = storageService.loadDrops();
         assertTrue(drops.isEmpty());
+    }
+
+    @Test
+    public void testLoadLegacyBareArrayDrops() throws Exception {
+        // Simulate legacy v0 format: bare JSON array in drops.json
+        String legacyJson = "[{\"npcName\":\"Goblin\",\"npcCombatLevel\":5,\"dropTime\":1234,\"collapsed\":false,"
+                + "\"items\":[{\"itemId\":526,\"itemName\":\"Bones\",\"quantity\":1,\"gePrice\":30,\"haPrice\":10}]}]";
+        File legacyFile = new File(tempDir, "drops.json");
+        java.nio.file.Files.writeString(legacyFile.toPath(), legacyJson);
+
+        List<DropRecord> loaded = storageService.loadDrops();
+
+        assertEquals(1, loaded.size());
+        assertEquals("Goblin", loaded.get(0).npcName);
+        assertEquals(5, loaded.get(0).npcCombatLevel);
+        assertEquals(1234L, loaded.get(0).dropTime);
+    }
+
+    @Test
+    public void testLoadLegacyBareArrayTrips() throws Exception {
+        // Simulate legacy v0 format: bare JSON array in trips.json
+        String legacyJson = "[{\"tripName\":\"TRIP 1\",\"tripActive\":false,\"collapsed\":false,"
+                + "\"tripStartTimeEpoch\":1000,\"tripStartTime\":\"10:00\",\"tripEndTime\":\"11:00\","
+                + "\"tripEndTimeEpoch\":2000,\"tripKills\":5,\"tripValue\":1000,\"tripId\":1}]";
+        File legacyFile = new File(tempDir, "trips.json");
+        java.nio.file.Files.writeString(legacyFile.toPath(), legacyJson);
+
+        List<TripRecord> loaded = storageService.loadTrips();
+
+        assertEquals(1, loaded.size());
+        assertEquals("TRIP 1", loaded.get(0).tripName);
+        assertEquals(5, loaded.get(0).tripKills);
+        assertEquals(1000, loaded.get(0).tripValue);
+    }
+
+    @Test
+    public void testVersionedFilePreferredOverLegacy() throws Exception {
+        // Write legacy v0 with one drop
+        String legacyJson = "[{\"npcName\":\"OldDrop\",\"npcCombatLevel\":1,\"dropTime\":100,\"collapsed\":false,\"items\":[]}]";
+        File legacyFile = new File(tempDir, "drops.json");
+        java.nio.file.Files.writeString(legacyFile.toPath(), legacyJson);
+
+        // Write v1 with a different drop
+        String v1Json = "{\"version\":1,\"drops\":[{\"npcName\":\"NewDrop\",\"npcCombatLevel\":2,\"dropTime\":200,\"collapsed\":false,\"items\":[]}]}";
+        File v1File = new File(tempDir, "drops.v1.json");
+        java.nio.file.Files.writeString(v1File.toPath(), v1Json);
+
+        List<DropRecord> loaded = storageService.loadDrops();
+
+        // Should load from v1, not legacy
+        assertEquals(1, loaded.size());
+        assertEquals("NewDrop", loaded.get(0).npcName);
+    }
+
+    @Test
+    public void testFallsBackToLegacyWhenVersionedMissing() throws Exception {
+        // Only legacy file exists, no v1
+        String legacyJson = "[{\"npcName\":\"FallbackDrop\",\"npcCombatLevel\":3,\"dropTime\":300,\"collapsed\":false,\"items\":[]}]";
+        File legacyFile = new File(tempDir, "drops.json");
+        java.nio.file.Files.writeString(legacyFile.toPath(), legacyJson);
+
+        List<DropRecord> loaded = storageService.loadDrops();
+
+        assertEquals(1, loaded.size());
+        assertEquals("FallbackDrop", loaded.get(0).npcName);
+    }
+
+    @Test
+    public void testSaveWritesToVersionedFile() throws Exception {
+        List<TrackableItemDrop> drops = new ArrayList<>();
+        TrackableItemDrop drop = new TrackableItemDrop("Saved", 10, 5000L);
+        drop.addLootToDrop(new TrackableDroppedItem(526, "Bones", 1, 30, 10));
+        drops.add(drop);
+
+        storageService.saveDropsSync(drops);
+
+        // Should write to drops.v1.json, not drops.json
+        File v1File = new File(tempDir, "drops.v1.json");
+        File legacyFile = new File(tempDir, "drops.json");
+        assertTrue(v1File.exists());
+        assertFalse(legacyFile.exists());
+    }
+
+    @Test
+    public void testLegacyFilePreservedAfterSave() throws Exception {
+        // Write legacy file
+        String legacyJson = "[{\"npcName\":\"Legacy\",\"npcCombatLevel\":1,\"dropTime\":100,\"collapsed\":false,\"items\":[]}]";
+        File legacyFile = new File(tempDir, "drops.json");
+        java.nio.file.Files.writeString(legacyFile.toPath(), legacyJson);
+
+        // Load (reads from legacy) then save (writes to v1)
+        List<DropRecord> loaded = storageService.loadDrops();
+        assertEquals(1, loaded.size());
+
+        List<TrackableItemDrop> drops = new ArrayList<>();
+        drops.add(loaded.get(0).toDrop());
+        storageService.saveDropsSync(drops);
+
+        // Both files should exist — legacy preserved as backup
+        assertTrue(legacyFile.exists());
+        assertTrue(new File(tempDir, "drops.v1.json").exists());
+
+        // Legacy file content unchanged
+        String legacyContent = java.nio.file.Files.readString(legacyFile.toPath());
+        assertEquals(legacyJson, legacyContent);
     }
 
     @Test

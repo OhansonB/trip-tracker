@@ -5,8 +5,8 @@
 ### 1. ~~Item sprite display mode~~ ✅ Done
 Configurable toggle added to display items as sprite icons in a 5-column grid with quantity overlays (using `ItemManager.getImage`). Falls back to text list when disabled. Panel rebuilds live when the setting is toggled.
 
-### 2. Schema version for persisted data
-Add a `"version": N` field to the root of `drops.json` and `trips.json`. Load logic should check version and run migration functions when the format changes. See `.kiro/steering/data-persistence.md` for the rules.
+### 2. ~~Schema version for persisted data~~ ✅ Done
+Added versioned file naming (`drops.v1.json`, `trips.v1.json`). Load scans from highest version down to legacy bare arrays. Old files preserved as backups. Steering file updated with migration checklist.
 
 ### 3. Trip persistence across client close
 Do not automatically deactivate trips when the client shuts down. A trip may span a relog (e.g., DKs, slayer tasks). Instead:
