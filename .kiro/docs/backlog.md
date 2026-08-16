@@ -2,8 +2,8 @@
 
 ## To Do
 
-### 1. Item sprite display mode
-Configurable option to display items as sprite icons overlaid with quantity (like RuneLite's native Loot Tracker) rather than the current text list. Uses `ItemManager.getImage(itemId, quantity, stackable)` to render item sprites in a grid. Should be a toggle in config so users can switch between text and sprite mode.
+### 1. ~~Item sprite display mode~~ ✅ Done
+Configurable toggle added to display items as sprite icons in a 5-column grid with quantity overlays (using `ItemManager.getImage`). Falls back to text list when disabled. Panel rebuilds live when the setting is toggled.
 
 ### 2. Schema version for persisted data
 Add a `"version": N` field to the root of `drops.json` and `trips.json`. Load logic should check version and run migration functions when the format changes. See `.kiro/steering/data-persistence.md` for the rules.
@@ -246,8 +246,7 @@ Collapse state is now persisted for all views: trips via `trips.json`, list drop
 | # | Feature | Impact | Effort | Suggested Order | Status |
 |---|---------|--------|--------|-----------------|--------|
 | 16 | Disable farming in CoX | Bug fix | Low | 1st — prevents bad data being tracked now | ✅ Done |
-| 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue | ✅ Done |
-| 2 | Schema version | Safety | Low | 3rd — safety net before any model changes | |
+| 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue | ✅ Done |n
 | 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination | |
 | 3 | Trip persistence | QoL | Medium | 5th — common pain point | |
 | 11 | Trip sort by value | QoL | Low | 6th — quick win, better readability | |
