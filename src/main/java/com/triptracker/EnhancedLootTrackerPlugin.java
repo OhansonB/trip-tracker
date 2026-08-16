@@ -184,7 +184,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Subscribe
 	public void onConfigChanged(net.runelite.client.events.ConfigChanged event) {
-		// Reserved for future config reactions
+		if ("triptracker".equals(event.getGroup()) && "spriteDisplayMode".equals(event.getKey())) {
+			SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+		}
 	}
 
 	@Override
@@ -244,6 +246,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		List<DropRecord> dropRecords = storageService.loadDrops();
 		for (DropRecord record : dropRecords) {
 			TrackableItemDrop drop = record.toDrop();
+			// Strip farming-excluded items from legacy farming drops that were persisted
+			// before the exclusion filter existed
+			stripFarmingExcludedItems(drop);
 			listViewDropArray.add(drop);
 			addDropToGroupedAggregates(drop);
 		}
@@ -1136,6 +1141,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		storageService.saveCollapsedNpcs(panel.getCollapsedNpcs());
 	}
 
+	public ItemManager getItemManager() {
+		return itemManager;
+	}
+
+	public boolean isSpriteDisplayMode() {
+		return config.spriteDisplayMode();
+	}
+
 	/**
 	 * Sends a debug message to game chat when debug mode is enabled.
 	 */
@@ -1220,5 +1233,44 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				storageService.saveTrips(tripsCopy);
 			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
 		}
+	}
+
+	// NPC names used as farming sources (capitalized form of farmingPatchType values)
+	private static final Set<String> FARMING_SOURCE_NAMES = new HashSet<>(Arrays.asList(
+			"Herb Patch", "Cactus Patch", "Farming Patch"
+	));
+
+	/**
+	 * Strips FARMING_EXCLUDED_ITEM_IDS from drops whose source is a farming patch.
+	 * This cleans up legacy persisted data that was recorded before the exclusion filter existed.
+	 * Drops from non-farming sources (e.g., Zalcano dropping crystal teleport seeds) are left untouched.
+	 */
+	private void stripFarmingExcludedItems(TrackableItemDrop drop) {
+		String source = drop.getDropNpcName();
+		if (source == null) {
+			return;
+		}
+		// Only strip from farming sources — also match tree sources like "Coconut Tree"
+		boolean isFarmingSource = FARMING_SOURCE_NAMES.contains(source) || source.endsWith(" Tree");
+		if (!isFarmingSource) {
+			return;
+		}
+		drop.getDroppedItems().removeIf(item -> FARMING_EXCLUDED_ITEM_IDS.contains(item.getItemId()));
+	}
+
+	/**
+	 * Strips FARMING_EXCLUDED_ITEM_IDS from an NPC aggregate if it belongs to a farming source.
+	 * Used during trip restoration to clean up legacy persisted data.
+	 */
+	public void stripFarmingExcludedItemsFromAggregate(NpcLootAggregate aggregate) {
+		String source = aggregate.getNpcName();
+		if (source == null) {
+			return;
+		}
+		boolean isFarmingSource = FARMING_SOURCE_NAMES.contains(source) || source.endsWith(" Tree");
+		if (!isFarmingSource) {
+			return;
+		}
+		aggregate.getDroppedItems().removeIf(item -> FARMING_EXCLUDED_ITEM_IDS.contains(item.getItemId()));
 	}
 }

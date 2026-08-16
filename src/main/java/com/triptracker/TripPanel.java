@@ -61,7 +61,8 @@ public class TripPanel {
 
         summaryPanelTitle = new JLabel(trip.getTripName());
         summaryPanelTitle.setFont(FontManager.getRunescapeBoldFont());
-        summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+        summaryPanelTitle.setForeground(Color.WHITE);
+        summaryPanelTitle.setBorder(new EmptyBorder(0, 0, 3, 0));
         contentPanel.add(summaryPanelTitle);
 
         // Inline stats: kills | value | gp/hr | duration
@@ -71,7 +72,7 @@ public class TripPanel {
                 trip.calculateTripDuration();
         statsLabel = new JLabel(statsText);
         statsLabel.setFont(FontManager.getRunescapeSmallFont());
-        statsLabel.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        statsLabel.setForeground(Color.WHITE);
         contentPanel.add(statsLabel);
 
         contentPanel.add(statusLabel);
@@ -145,7 +146,8 @@ public class TripPanel {
         // Restore persisted collapse state
         if (trip.isCollapsed()) {
             lootPanel.setVisible(false);
-            summaryPanelTitle.setForeground(new Color(0xB0, 0xB0, 0xB0));
+            summaryPanelTitle.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+            statsLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
         }
 
         return outerPanel;
@@ -268,11 +270,13 @@ public class TripPanel {
     private void toggleCollapse() {
         if (lootPanel.isVisible()) {
             lootPanel.setVisible(false);
-            summaryPanelTitle.setForeground(new Color(0xB0, 0xB0, 0xB0));
+            summaryPanelTitle.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+            statsLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
             trip.setCollapsed(true);
         } else {
             lootPanel.setVisible(true);
-            summaryPanelTitle.setForeground(Color.LIGHT_GRAY);
+            summaryPanelTitle.setForeground(Color.WHITE);
+            statsLabel.setForeground(Color.WHITE);
             trip.setCollapsed(false);
         }
         trip.getParentPlugin().onTripStatusChanged();

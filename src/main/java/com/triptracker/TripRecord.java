@@ -91,6 +91,9 @@ public class TripRecord {
                 }
             }
 
+            // Strip farming-excluded items from legacy farming-sourced aggregates
+            plugin.stripFarmingExcludedItemsFromAggregate(aggregate);
+
             // Restore kill count and last kill time directly
             aggregate.numberOfKills = aggRecord.numberOfKills;
             aggregate.lastKillTime = aggRecord.lastKillTime;

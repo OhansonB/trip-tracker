@@ -46,6 +46,17 @@ public interface EnhancedLootTrackerConfig extends Config {
 
 	@ConfigItem(
 			position = 2,
+			keyName = "spriteDisplayMode",
+			name = "Show items as sprites",
+			description = "Display items as sprite icons with quantity overlays instead of text list"
+	)
+	default boolean spriteDisplayMode()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			position = 3,
 			keyName = "debugMode",
 			name = "Debug mode",
 			description = "Show detection events in game chat for troubleshooting"
@@ -56,7 +67,7 @@ public interface EnhancedLootTrackerConfig extends Config {
 	}
 
 	@ConfigItem(
-			position = 3,
+			position = 4,
 			keyName = "maxDrops",
 			name = "Max drops to keep (10-10000)",
 			description = "Maximum number of individual drop events to persist (oldest are removed first)"
@@ -68,7 +79,7 @@ public interface EnhancedLootTrackerConfig extends Config {
 	}
 
 	@ConfigItem(
-			position = 4,
+			position = 5,
 			keyName = "maxTrips",
 			name = "Max trips to keep (5-200)",
 			description = "Maximum number of trips to persist (oldest are removed first)"

@@ -176,7 +176,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JLabel textLabel = new JLabel(label, SwingConstants.CENTER);
         textLabel.setFont(FontManager.getRunescapeSmallFont());
-        textLabel.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        textLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
         textLabel.setLabelFor(button);
 
         panel.add(button, BorderLayout.CENTER);
@@ -208,7 +208,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JLabel titleLabel = new JLabel();
         titleLabel.setText("TRIP TRACKERS");
         titleLabel.setFont(FontManager.getRunescapeBoldFont());
-        titleLabel.setForeground(Color.LIGHT_GRAY);
+        titleLabel.setForeground(Color.WHITE);
         innerPanel.add(titleLabel, BorderLayout.CENTER);
 
         SwingUtil.removeButtonDecorations(addTripButton);
@@ -298,7 +298,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JLabel label = new JLabel("<html><center>" + text + "</center></html>", SwingConstants.CENTER);
         label.setFont(FontManager.getRunescapeSmallFont());
-        label.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
         panel.add(label, BorderLayout.CENTER);
 
         return panel;
@@ -311,7 +311,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(FontManager.getRunescapeSmallFont());
-        label.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        label.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
         panel.add(label, BorderLayout.CENTER);
 
         return panel;
@@ -319,7 +319,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     // This method is used for adding a loot box when in list view mode
     public void addLootBox(TrackableItemDrop itemDrop) {
-        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop);
+        LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         newDropBox.setOnCollapseChanged(() -> parentPlugin.onDropCollapseChanged());
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
         lootBoxPanel.revalidate();
@@ -334,7 +334,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(lootAggregation, npcName, numberOfKills, lastKillTime, npcLootAggregate.collapsed, () -> {
             npcLootAggregate.collapsed = !npcLootAggregate.collapsed;
             parentPlugin.onTripStatusChanged();
-        });
+        }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         JPanel newLootPanel = newDropBox.buildPanelBox();
         newLootPanel.setName(npcName);
 
@@ -389,7 +389,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 collapsedNpcs.add(npcName);
             }
             parentPlugin.onGroupedCollapseChanged();
-        });
+        }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         JPanel newLootPanel = newDropBox.buildPanelBox();
 
         if (groupedLootBoxPanels.containsKey(npcName)) {
@@ -452,7 +452,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                         LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill, aggregate.collapsed, () -> {
                             aggregate.collapsed = !aggregate.collapsed;
                             parentPlugin.onTripStatusChanged();
-                        });
+                        }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
                         lootPanels.put(npcName, panelBox);
                     }
                 }

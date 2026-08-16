@@ -112,10 +112,10 @@ public class TripComparisonPanel extends JPanel {
         add(checklistPanel);
 
         // Export buttons
-        JPanel exportPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
+        JPanel exportPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
         exportPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         exportPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        exportPanel.setBorder(new EmptyBorder(0, 4, 12, 0));
+        exportPanel.setBorder(new EmptyBorder(0, 0, 12, 0));
 
         JButton exportCsvButton = new JButton("Export CSV");
         exportCsvButton.setFont(FontManager.getRunescapeSmallFont());
