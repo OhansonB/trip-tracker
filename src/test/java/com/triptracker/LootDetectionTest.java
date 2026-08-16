@@ -294,6 +294,124 @@ public class LootDetectionTest {
         assertEquals(50, snapshot.count(995));
     }
 
+    // === Bird Nest Tests ===
+
+    @Test
+    public void testBirdNestSearchCreatesDropWithCorrectSource() throws Exception {
+        // Set up: bird nest search triggered (simulates onMenuOptionClicked setting state)
+        Multiset<Integer> beforeSnapshot = HashMultiset.create();
+        beforeSnapshot.add(5073, 1); // 1 seed nest in inventory
+        setField(plugin, "awaitingBirdNestDiff", true);
+        setField(plugin, "preLootInventorySnapshot", beforeSnapshot);
+
+        // Simulate inventory after search: nest consumed, seeds gained
+        ItemContainer mockContainer = mock(ItemContainer.class);
+        Item[] inventoryItems = new Item[1];
+        inventoryItems[0] = mockItem(5295, 1); // Ranarr seed
+        when(mockContainer.getItems()).thenReturn(inventoryItems);
+        when(mockClient.getItemContainer(93)).thenReturn(mockContainer);
+        when(mockClient.getTickCount()).thenReturn(1);
+
+        ItemContainerChanged event = new ItemContainerChanged(93, mockContainer);
+        plugin.onItemContainerChanged(event);
+
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        assertEquals(1, drops.size());
+        assertEquals("Bird nest", drops.get(0).getDropNpcName());
+    }
+
+    @Test
+    public void testMultipleBirdNestsSearchedSequentially() throws Exception {
+        // Simulates the bug: player searches one nest, game auto-searches the rest.
+        // The flag should remain active so subsequent inventory changes are captured.
+
+        // Start: 3 seed nests in inventory
+        Multiset<Integer> beforeSnapshot = HashMultiset.create();
+        beforeSnapshot.add(5073, 3); // 3 seed nests
+        setField(plugin, "awaitingBirdNestDiff", true);
+        setField(plugin, "preLootInventorySnapshot", beforeSnapshot);
+
+        // First nest searched: 2 nests remain, 1 seed gained
+        ItemContainer mockContainer1 = mock(ItemContainer.class);
+        Item[] afterFirst = new Item[2];
+        afterFirst[0] = mockItem(5073, 2); // 2 nests remain
+        afterFirst[1] = mockItem(5295, 1); // 1 ranarr seed
+        when(mockContainer1.getItems()).thenReturn(afterFirst);
+        when(mockClient.getItemContainer(93)).thenReturn(mockContainer1);
+        when(mockClient.getTickCount()).thenReturn(1);
+
+        plugin.onItemContainerChanged(new ItemContainerChanged(93, mockContainer1));
+
+        // First nest should be tracked
+        List<TrackableItemDrop> drops = plugin.getListViewDropArray();
+        assertEquals(1, drops.size());
+
+        // awaitingBirdNestDiff should still be true (debounce keeps it active)
+        boolean stillAwaiting = (boolean) getField(plugin, "awaitingBirdNestDiff");
+        assertTrue("Flag should remain active for subsequent nests", stillAwaiting);
+
+        // Second nest searched (next tick): 1 nest remains, 2nd seed gained
+        ItemContainer mockContainer2 = mock(ItemContainer.class);
+        Item[] afterSecond = new Item[2];
+        afterSecond[0] = mockItem(5073, 1); // 1 nest remains
+        afterSecond[1] = mockItem(5295, 2); // 2 seeds total
+        when(mockContainer2.getItems()).thenReturn(afterSecond);
+        when(mockClient.getItemContainer(93)).thenReturn(mockContainer2);
+        when(mockClient.getTickCount()).thenReturn(2);
+
+        plugin.onItemContainerChanged(new ItemContainerChanged(93, mockContainer2));
+
+        // Second nest should also be tracked
+        drops = plugin.getListViewDropArray();
+        assertEquals(2, drops.size());
+        assertEquals("Bird nest", drops.get(1).getDropNpcName());
+
+        // Third nest searched: 0 nests remain, 3rd seed gained
+        ItemContainer mockContainer3 = mock(ItemContainer.class);
+        Item[] afterThird = new Item[1];
+        afterThird[0] = mockItem(5295, 3); // 3 seeds total
+        when(mockContainer3.getItems()).thenReturn(afterThird);
+        when(mockClient.getItemContainer(93)).thenReturn(mockContainer3);
+        when(mockClient.getTickCount()).thenReturn(3);
+
+        plugin.onItemContainerChanged(new ItemContainerChanged(93, mockContainer3));
+
+        // Third nest should also be tracked
+        drops = plugin.getListViewDropArray();
+        assertEquals(3, drops.size());
+        assertEquals("Bird nest", drops.get(2).getDropNpcName());
+    }
+
+    @Test
+    public void testBirdNestFlagEventuallyClears() throws Exception {
+        // Verify the debounce timer will clear the flag after timeout
+
+        Multiset<Integer> beforeSnapshot = HashMultiset.create();
+        beforeSnapshot.add(5073, 1);
+        setField(plugin, "awaitingBirdNestDiff", true);
+        setField(plugin, "preLootInventorySnapshot", beforeSnapshot);
+
+        // Process one nest
+        ItemContainer mockContainer = mock(ItemContainer.class);
+        Item[] inventoryItems = new Item[1];
+        inventoryItems[0] = mockItem(5295, 1);
+        when(mockContainer.getItems()).thenReturn(inventoryItems);
+        when(mockClient.getItemContainer(93)).thenReturn(mockContainer);
+        when(mockClient.getTickCount()).thenReturn(1);
+
+        plugin.onItemContainerChanged(new ItemContainerChanged(93, mockContainer));
+
+        // Flag should still be true immediately after
+        assertTrue((boolean) getField(plugin, "awaitingBirdNestDiff"));
+
+        // Wait for debounce to expire (1200ms + buffer)
+        Thread.sleep(1500);
+
+        // Flag should now be cleared by the debounce timer
+        assertFalse("Flag should be cleared after debounce expires",
+                (boolean) getField(plugin, "awaitingBirdNestDiff"));
+    }
+
     // === Retention and Clear Tests ===
 
     @Test

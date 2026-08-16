@@ -100,6 +100,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	// Flag for bird nest search inventory diff
 	private boolean awaitingBirdNestDiff;
+	private ScheduledFuture<?> birdNestDebounceTimer;
+	private static final long BIRD_NEST_DEBOUNCE_MS = 1200; // ~2 game ticks to catch auto-searched nests
 
 	// Items to exclude from farming harvest tracking (not actual harvests)
 	private static final Set<Integer> FARMING_EXCLUDED_ITEM_IDS = new HashSet<>(Arrays.asList(
@@ -246,6 +248,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 			if (farmingDebounceTimer != null) {
 				farmingDebounceTimer.cancel(false);
+			}
+			if (birdNestDebounceTimer != null) {
+				birdNestDebounceTimer.cancel(false);
 			}
 		}
 		debounceExecutor.shutdown();
@@ -625,7 +630,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			} else if (awaitingBirdNestDiff) {
 				// Process bird nest search loot diff
-				awaitingBirdNestDiff = false;
+				// Don't clear the flag yet — auto-searched nests may follow on subsequent ticks
 
 				Multiset<Integer> newItems = compareInventorySnapshot(currentSnapshot, preLootInventorySnapshot);
 
@@ -645,6 +650,20 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					if (!nestDrop.getDroppedItems().isEmpty()) {
 						processNewDrop(nestDrop);
 					}
+
+					// Re-snapshot so the next auto-searched nest diffs correctly
+					preLootInventorySnapshot = currentSnapshot;
+				}
+
+				// Reset the debounce timer — if no more nest changes arrive, clear the flag
+				synchronized (saveLock) {
+					if (birdNestDebounceTimer != null && !birdNestDebounceTimer.isDone()) {
+						birdNestDebounceTimer.cancel(false);
+					}
+					birdNestDebounceTimer = debounceExecutor.schedule(() -> {
+						awaitingBirdNestDiff = false;
+						debugChat("Bird nest debounce expired — no more nests");
+					}, BIRD_NEST_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
 				}
 			}
 
