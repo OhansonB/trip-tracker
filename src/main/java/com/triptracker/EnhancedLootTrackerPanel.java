@@ -202,7 +202,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         innerPanel.setLayout(new BorderLayout());
         innerPanel.setBackground(ColorScheme.SCROLL_TRACK_COLOR);
         innerPanel.setPreferredSize(new Dimension(0, 30));
-        innerPanel.setBorder(new EmptyBorder(5, 69, 5, 5));
+        innerPanel.setBorder(new EmptyBorder(5, 60, 5, 12));
         outerPanel.add(innerPanel);
 
         JLabel titleLabel = new JLabel();
@@ -216,13 +216,23 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         addTripButton.setRolloverIcon(ADD_TRIP_TRACKER_ICON_HOVER);
         addTripButton.setToolTipText("Add a new trip tracker");
         addTripButton.getAccessibleContext().setAccessibleName("Add new trip");
+        addTripButton.setPreferredSize(new Dimension(20, 20));
         addTripButton.setFocusable(true);
+        // Only show focus border on keyboard navigation, not mouse click
+        addTripButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                addTripButton.putClientProperty("focusedByMouse", Boolean.TRUE);
+            }
+        });
         addTripButton.addFocusListener(new FocusAdapter() {
-            final Border focusBorder = new LineBorder(FOCUS_COLOR, 2);
-
             @Override
             public void focusGained(FocusEvent e) {
-                addTripButton.setBorder(focusBorder);
+                if (Boolean.TRUE.equals(addTripButton.getClientProperty("focusedByMouse"))) {
+                    addTripButton.putClientProperty("focusedByMouse", null);
+                    return;
+                }
+                addTripButton.setBorder(new LineBorder(FOCUS_COLOR, 2));
             }
 
             @Override
@@ -293,6 +303,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     private JPanel buildEmptyStateLabel(String text) {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setName("emptyState");
         panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         panel.setBorder(new EmptyBorder(20, 10, 20, 10));
 
@@ -477,8 +488,16 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             activeTripLootPanels = new LinkedHashMap<>();
             tripPanelBoxes.put(activeTrip.getTripId(), activeTripLootPanels);
 
-            // Rebuild to remove empty state and show the new trip
-            rebuildLootPanel();
+            // Remove empty state if present, then add the new trip header without a full rebuild
+            if (lootBoxPanel.getComponentCount() > 1) {
+                Component second = lootBoxPanel.getComponent(1);
+                if (second instanceof JPanel && "emptyState".equals(second.getName())) {
+                    lootBoxPanel.remove(second);
+                }
+            }
+            lootBoxPanel.add(tripPanel.buildHeaderPanel(), 1);
+            lootBoxPanel.revalidate();
+            lootBoxPanel.repaint();
 
         } else {
             int selectedOption = JOptionPane.showConfirmDialog(null,
@@ -543,6 +562,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         tripsMap.remove(tripId);
         tripPanelBoxes.remove(tripId);
         rebuildLootPanel();
+        // Move focus to the + button to prevent accidental focus on "Clear all data"
+        addTripButton.requestFocusInWindow();
     }
 
     private void confirmClearAllData() {

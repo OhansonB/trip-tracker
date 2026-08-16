@@ -83,6 +83,12 @@ A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour stats, 
 - Red "Clear all data" button with confirmation
 - Values shortened for readability (10k, 1.5m, 2.1b)
 
+### Keyboard Shortcuts
+
+- **Tab** — Move focus between panels and buttons
+- **Enter / Space** — Toggle collapse on focused trip or loot panel, or activate focused button
+- **Shift+F10** — Open context menu on focused trip header
+
 ## Known Limitations
 
 - Items going directly to the **herb sack** or **seed box** (without touching the ground or inventory) may not be tracked. For accurate tracking during trips, consider closing these containers.
