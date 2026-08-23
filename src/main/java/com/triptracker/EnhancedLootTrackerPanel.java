@@ -938,7 +938,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         TripComparisonPanel comparisonPanel = new TripComparisonPanel(
                 parentPlugin.getTrips(),
                 preSelectedTripId,
-                this::hideComparisonView
+                this::hideComparisonView,
+                parentPlugin
         );
 
         setLayout(new BorderLayout());

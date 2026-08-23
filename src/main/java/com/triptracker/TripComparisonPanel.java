@@ -26,10 +26,12 @@ public class TripComparisonPanel extends JPanel {
     private final JPanel tablePanel;
     private final JPanel checklistPanel;
     private final Runnable onBackAction;
+    private final EnhancedLootTrackerPlugin plugin;
 
-    public TripComparisonPanel(List<Trip> allTrips, int preSelectedTripId, Runnable onBackAction) {
+    public TripComparisonPanel(List<Trip> allTrips, int preSelectedTripId, Runnable onBackAction, EnhancedLootTrackerPlugin plugin) {
         this.allTrips = allTrips;
         this.onBackAction = onBackAction;
+        this.plugin = plugin;
         this.selectedTripIds.add(preSelectedTripId);
 
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -112,12 +114,17 @@ public class TripComparisonPanel extends JPanel {
         add(checklistPanel);
 
         // Export buttons
-        JPanel exportPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        JPanel exportPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
         exportPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         exportPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         exportPanel.setBorder(new EmptyBorder(0, 0, 12, 0));
 
-        JButton exportCsvButton = new JButton("Export CSV");
+        JLabel exportLabel = new JLabel("Export:");
+        exportLabel.setFont(FontManager.getRunescapeSmallFont());
+        exportLabel.setForeground(Color.LIGHT_GRAY);
+        exportPanel.add(exportLabel);
+
+        JButton exportCsvButton = new JButton("CSV");
         exportCsvButton.setFont(FontManager.getRunescapeSmallFont());
         exportCsvButton.setForeground(Color.LIGHT_GRAY);
         exportCsvButton.setContentAreaFilled(false);
@@ -128,11 +135,11 @@ public class TripComparisonPanel extends JPanel {
         addKeyboardFocusIndicator(exportCsvButton);
         exportPanel.add(exportCsvButton);
 
-        JLabel exportSep = new JLabel("|");
-        exportSep.setForeground(new Color(0xB0, 0xB0, 0xB0));
-        exportPanel.add(exportSep);
+        JLabel sep1 = new JLabel("|");
+        sep1.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        exportPanel.add(sep1);
 
-        JButton exportJsonButton = new JButton("Export JSON");
+        JButton exportJsonButton = new JButton("JSON");
         exportJsonButton.setFont(FontManager.getRunescapeSmallFont());
         exportJsonButton.setForeground(Color.LIGHT_GRAY);
         exportJsonButton.setContentAreaFilled(false);
@@ -142,6 +149,21 @@ public class TripComparisonPanel extends JPanel {
         exportJsonButton.addActionListener(e -> exportJson());
         addKeyboardFocusIndicator(exportJsonButton);
         exportPanel.add(exportJsonButton);
+
+        JLabel sep2 = new JLabel("|");
+        sep2.setForeground(new Color(0xB0, 0xB0, 0xB0));
+        exportPanel.add(sep2);
+
+        JButton exportPrettyButton = new JButton("Pretty");
+        exportPrettyButton.setFont(FontManager.getRunescapeSmallFont());
+        exportPrettyButton.setForeground(Color.LIGHT_GRAY);
+        exportPrettyButton.setContentAreaFilled(false);
+        exportPrettyButton.setBorderPainted(false);
+        exportPrettyButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        exportPrettyButton.getAccessibleContext().setAccessibleName("Export comparison as plain text for Discord");
+        exportPrettyButton.addActionListener(e -> exportPretty());
+        addKeyboardFocusIndicator(exportPrettyButton);
+        exportPanel.add(exportPrettyButton);
 
         add(exportPanel);
 
@@ -239,16 +261,17 @@ public class TripComparisonPanel extends JPanel {
         nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         container.add(nameLabel);
 
-        // Metrics row
+        // Metrics row (respects exclusions)
+        AdjustedTripStats stats = getAdjustedStats(trip);
         JPanel metricsRow = new JPanel(new GridLayout(1, 5, 4, 0));
         metricsRow.setBackground(ColorScheme.DARK_GRAY_HOVER_COLOR);
         metricsRow.setBorder(new EmptyBorder(2, 0, 0, 0));
 
-        metricsRow.add(buildMetricLabel(String.valueOf(trip.getTripKills())));
+        metricsRow.add(buildMetricLabel(String.valueOf(stats.kills)));
         metricsRow.add(buildMetricLabel(trip.calculateTripDuration()));
-        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(trip.getTripValue())));
-        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(trip.getGpPerHour())));
-        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(trip.getGpPerKill())));
+        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(stats.value)));
+        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(stats.gpPerHour)));
+        metricsRow.add(buildMetricLabel(FormatUtil.shortenNumber(stats.gpPerKill)));
 
         container.add(metricsRow);
         return container;
@@ -280,12 +303,13 @@ public class TripComparisonPanel extends JPanel {
         StringBuilder sb = new StringBuilder();
         sb.append("Trip Name,Kills,Duration (s),Value,GP/hr,GP/kill,Start,End\n");
         for (Trip trip : selected) {
+            AdjustedTripStats stats = getAdjustedStats(trip);
             sb.append(escapeCsv(trip.getTripName())).append(",");
-            sb.append(trip.getTripKills()).append(",");
+            sb.append(stats.kills).append(",");
             sb.append(trip.getDurationSeconds()).append(",");
-            sb.append(trip.getTripValue()).append(",");
-            sb.append(trip.getGpPerHour()).append(",");
-            sb.append(trip.getGpPerKill()).append(",");
+            sb.append(stats.value).append(",");
+            sb.append(stats.gpPerHour).append(",");
+            sb.append(stats.gpPerKill).append(",");
             sb.append(escapeCsv(formatIso(trip.getTripStartTimeEpoch()))).append(",");
             sb.append(escapeCsv(trip.getTripEndTimeEpoch() > 0 ? formatIso(trip.getTripEndTimeEpoch()) : "n/a")).append("\n");
         }
@@ -304,13 +328,14 @@ public class TripComparisonPanel extends JPanel {
         sb.append("[\n");
         for (int i = 0; i < selected.size(); i++) {
             Trip trip = selected.get(i);
+            AdjustedTripStats stats = getAdjustedStats(trip);
             sb.append("  {\n");
             sb.append("    \"name\": \"").append(trip.getTripName().replace("\"", "\\\"")).append("\",\n");
-            sb.append("    \"kills\": ").append(trip.getTripKills()).append(",\n");
+            sb.append("    \"kills\": ").append(stats.kills).append(",\n");
             sb.append("    \"durationSeconds\": ").append(trip.getDurationSeconds()).append(",\n");
-            sb.append("    \"value\": ").append(trip.getTripValue()).append(",\n");
-            sb.append("    \"gpPerHour\": ").append(trip.getGpPerHour()).append(",\n");
-            sb.append("    \"gpPerKill\": ").append(trip.getGpPerKill()).append(",\n");
+            sb.append("    \"value\": ").append(stats.value).append(",\n");
+            sb.append("    \"gpPerHour\": ").append(stats.gpPerHour).append(",\n");
+            sb.append("    \"gpPerKill\": ").append(stats.gpPerKill).append(",\n");
             sb.append("    \"start\": \"").append(formatIso(trip.getTripStartTimeEpoch())).append("\",\n");
             sb.append("    \"end\": \"").append(trip.getTripEndTimeEpoch() > 0 ? formatIso(trip.getTripEndTimeEpoch()) : "n/a").append("\"\n");
             sb.append("  }");
@@ -321,6 +346,76 @@ public class TripComparisonPanel extends JPanel {
 
         copyToClipboard(sb.toString());
         JOptionPane.showMessageDialog(this, "JSON copied to clipboard!", "Export", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void exportPretty() {
+        List<Trip> selected = getSelectedTrips();
+        if (selected.isEmpty()) {
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < selected.size(); i++) {
+            Trip trip = selected.get(i);
+            AdjustedTripStats stats = getAdjustedStats(trip);
+
+            sb.append(trip.getTripName()).append("\n");
+            sb.append("  Kills: ").append(stats.kills);
+            sb.append(" | Duration: ").append(trip.calculateTripDuration()).append("\n");
+            sb.append("  Value: ").append(FormatUtil.shortenNumber(stats.value)).append(" gp");
+            sb.append(" | GP/hr: ").append(FormatUtil.shortenNumber(stats.gpPerHour));
+            sb.append(" | GP/kill: ").append(FormatUtil.shortenNumber(stats.gpPerKill)).append("\n");
+
+            if (i < selected.size() - 1) {
+                sb.append("\n");
+            }
+        }
+
+        copyToClipboard(sb.toString());
+        JOptionPane.showMessageDialog(this, "Pretty text copied to clipboard!", "Export", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private AdjustedTripStats getAdjustedStats(Trip trip) {
+        Set<String> excludedItems = plugin.getExcludedItems();
+        Set<String> excludedNpcs = plugin.getExcludedNpcs();
+
+        long adjustedValue = trip.getTripValue();
+        int adjustedKills = trip.getTripKills();
+
+        for (NpcLootAggregate agg : trip.getTripAggregates()) {
+            if (excludedNpcs.contains(agg.getNpcName().toLowerCase().trim())) {
+                adjustedKills -= agg.getNumberOfKills();
+                for (TrackableDroppedItem item : agg.getDroppedItems()) {
+                    adjustedValue -= item.getTotalGePrice();
+                }
+            } else {
+                for (TrackableDroppedItem item : agg.getDroppedItems()) {
+                    if (excludedItems.contains(item.getItemName().toLowerCase().trim())) {
+                        adjustedValue -= item.getTotalGePrice();
+                    }
+                }
+            }
+        }
+
+        long durationSeconds = trip.getDurationSeconds();
+        long gpPerHour = durationSeconds > 0 ? (adjustedValue * 3600L) / durationSeconds : 0;
+        long gpPerKill = adjustedKills > 0 ? adjustedValue / adjustedKills : 0;
+
+        return new AdjustedTripStats(adjustedKills, adjustedValue, gpPerHour, gpPerKill);
+    }
+
+    private static class AdjustedTripStats {
+        final int kills;
+        final long value;
+        final long gpPerHour;
+        final long gpPerKill;
+
+        AdjustedTripStats(int kills, long value, long gpPerHour, long gpPerKill) {
+            this.kills = kills;
+            this.value = value;
+            this.gpPerHour = gpPerHour;
+            this.gpPerKill = gpPerKill;
+        }
     }
 
     private void copyToClipboard(String text) {
