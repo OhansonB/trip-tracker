@@ -43,6 +43,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private final JRadioButton tripModeButton = new JRadioButton();
     private final JButton addTripButton = new JButton();
     private final LinkedHashMap<String, JPanel> groupedLootBoxPanels = new LinkedHashMap<>();
+    private final LinkedHashMap<String, LootTrackingPanelBox> groupedPanelBoxes = new LinkedHashMap<>();
+    private final ArrayList<LootTrackingPanelBox> listViewPanelBoxes = new ArrayList<>();
     private final LinkedHashMap<Integer, TripPanel> tripsMap = new LinkedHashMap<>();
     private LinkedHashMap<String, LootTrackingPanelBox> activeTripLootPanels = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, LinkedHashMap<String, LootTrackingPanelBox>> tripPanelBoxes = new LinkedHashMap<>();
@@ -100,6 +102,35 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         filterPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         filterPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
 
+        // Collapse/Expand all buttons on the left
+        JPanel collapsePanel = new JPanel(new GridLayout(1, 2, 0, 0));
+        collapsePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+        JButton collapseAllButton = new JButton("\u2212"); // minus sign
+        collapseAllButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        collapseAllButton.setPreferredSize(new Dimension(22, 22));
+        collapseAllButton.setToolTipText("Collapse all");
+        collapseAllButton.getAccessibleContext().setAccessibleName("Collapse all");
+        collapseAllButton.setContentAreaFilled(false);
+        collapseAllButton.setBorderPainted(false);
+        collapseAllButton.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        collapseAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        collapseAllButton.addActionListener(e -> setAllCollapsed(true));
+
+        JButton expandAllButton = new JButton("+");
+        expandAllButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        expandAllButton.setPreferredSize(new Dimension(22, 22));
+        expandAllButton.setToolTipText("Expand all");
+        expandAllButton.getAccessibleContext().setAccessibleName("Expand all");
+        expandAllButton.setContentAreaFilled(false);
+        expandAllButton.setBorderPainted(false);
+        expandAllButton.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        expandAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        expandAllButton.addActionListener(e -> setAllCollapsed(false));
+
+        collapsePanel.add(collapseAllButton);
+        collapsePanel.add(expandAllButton);
+
         filterField = new JTextField();
         filterField.setFont(FontManager.getRunescapeSmallFont());
         filterField.setToolTipText("Filter by NPC name");
@@ -126,6 +157,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             filterField.setText("");
         });
 
+        filterPanel.add(collapsePanel, BorderLayout.WEST);
         filterPanel.add(filterField, BorderLayout.CENTER);
         filterPanel.add(clearButton, BorderLayout.EAST);
 
@@ -149,6 +181,35 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         panel.setBorder(new EmptyBorder(0, 0, 4, 0));
+
+        // Collapse/Expand all buttons on the left
+        JPanel collapsePanel = new JPanel(new GridLayout(1, 2, 0, 0));
+        collapsePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+        JButton collapseAllButton = new JButton("\u2212");
+        collapseAllButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        collapseAllButton.setPreferredSize(new Dimension(22, 22));
+        collapseAllButton.setToolTipText("Collapse all trips");
+        collapseAllButton.getAccessibleContext().setAccessibleName("Collapse all trips");
+        collapseAllButton.setContentAreaFilled(false);
+        collapseAllButton.setBorderPainted(false);
+        collapseAllButton.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        collapseAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        collapseAllButton.addActionListener(e -> setAllCollapsed(true));
+
+        JButton expandAllButton = new JButton("+");
+        expandAllButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+        expandAllButton.setPreferredSize(new Dimension(22, 22));
+        expandAllButton.setToolTipText("Expand all trips");
+        expandAllButton.getAccessibleContext().setAccessibleName("Expand all trips");
+        expandAllButton.setContentAreaFilled(false);
+        expandAllButton.setBorderPainted(false);
+        expandAllButton.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        expandAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        expandAllButton.addActionListener(e -> setAllCollapsed(false));
+
+        collapsePanel.add(collapseAllButton);
+        collapsePanel.add(expandAllButton);
 
         if (tripFilterField == null) {
             tripFilterField = new JTextField();
@@ -174,6 +235,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clearButton.addActionListener(e -> tripFilterField.setText(""));
 
+        panel.add(collapsePanel, BorderLayout.WEST);
         panel.add(tripFilterField, BorderLayout.CENTER);
         panel.add(clearButton, BorderLayout.EAST);
 
@@ -391,6 +453,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private void rebuildLootPanel() {
         // Remove all components from lootBoxPanel
         SwingUtil.fastRemoveAll(lootBoxPanel);
+        listViewPanelBoxes.clear();
 
         // Show/hide the main filter panel based on mode (trip view uses its own inline filter)
         if (filterPanel != null) {
@@ -463,6 +526,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         }
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         newDropBox.setOnCollapseChanged(() -> parentPlugin.onDropCollapseChanged());
+        listViewPanelBoxes.add(0, newDropBox);
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
@@ -538,9 +602,12 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
             groupedLootBoxPanels.remove(npcName);
             groupedLootBoxPanels.put(npcName, newLootPanel);
+            groupedPanelBoxes.remove(npcName);
+            groupedPanelBoxes.put(npcName, newDropBox);
 
         } else {
             groupedLootBoxPanels.put(npcName, newLootPanel);
+            groupedPanelBoxes.put(npcName, newDropBox);
         }
 
         if (selectedTrackingMode == 1) {
@@ -558,6 +625,45 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         if (newTrackingModeType != selectedTrackingMode) {
             selectedTrackingMode = newTrackingModeType;
             rebuildLootPanel();
+        }
+    }
+
+    /**
+     * Collapse or expand all items in the current view.
+     * - List view: toggles collapsed state on each TrackableItemDrop.
+     * - Grouped view: adds/removes all NPC names from the collapsedNpcs set.
+     * - Trip view: toggles collapsed state on each Trip (not NPC aggregates within).
+     */
+    private void setAllCollapsed(boolean collapsed) {
+        switch (selectedTrackingMode) {
+            case 0: // List view — toggle each box in-place (no rebuild)
+                for (TrackableItemDrop drop : parentPlugin.getListViewDropArray()) {
+                    drop.setCollapsed(collapsed);
+                }
+                for (LootTrackingPanelBox box : listViewPanelBoxes) {
+                    box.setCollapsedState(collapsed);
+                }
+                parentPlugin.onDropCollapseChanged();
+                break;
+
+            case 1: // Grouped view — toggle each box in-place (no rebuild)
+                if (collapsed) {
+                    collapsedNpcs.addAll(groupedLootBoxPanels.keySet());
+                } else {
+                    collapsedNpcs.clear();
+                }
+                for (LootTrackingPanelBox box : groupedPanelBoxes.values()) {
+                    box.setCollapsedState(collapsed);
+                }
+                parentPlugin.onGroupedCollapseChanged();
+                break;
+
+            case 2: // Trip view — collapse/expand trip headers directly (no rebuild)
+                for (TripPanel tripPanel : tripsMap.values()) {
+                    tripPanel.setCollapsedState(collapsed);
+                }
+                parentPlugin.onTripStatusChanged();
+                break;
         }
     }
 
@@ -696,7 +802,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     public void removeTrip(int tripId) {
         tripsMap.remove(tripId);
         tripPanelBoxes.remove(tripId);
-        rebuildLootPanel();
+        lootBoxPanel.setVisible(false);
+        rebuildTripEntries();
+        lootBoxPanel.setVisible(true);
         // Move focus to the + button to prevent accidental focus on "Clear all data"
         addTripButton.requestFocusInWindow();
     }

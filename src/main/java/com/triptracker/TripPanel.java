@@ -328,4 +328,20 @@ public class TripPanel {
     public Trip getTrip() {
         return trip;
     }
+
+    /**
+     * Programmatically set the collapsed state without triggering a full panel rebuild.
+     */
+    public void setCollapsedState(boolean collapsed) {
+        if (collapsed) {
+            lootPanel.setVisible(false);
+            summaryPanelTitle.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+            statsLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        } else {
+            lootPanel.setVisible(true);
+            summaryPanelTitle.setForeground(Color.WHITE);
+            statsLabel.setForeground(Color.WHITE);
+        }
+        trip.setCollapsed(collapsed);
+    }
 }

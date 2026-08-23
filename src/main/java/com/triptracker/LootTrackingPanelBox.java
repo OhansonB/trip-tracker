@@ -373,6 +373,7 @@ public class LootTrackingPanelBox extends JPanel {
     }
 
     private void updateCollapseState(boolean collapsed) {
+        this.initialCollapsed = collapsed;
         if (boxType == 0 && itemDrop != null) {
             itemDrop.setCollapsed(collapsed);
         }
@@ -383,5 +384,22 @@ public class LootTrackingPanelBox extends JPanel {
 
     void setOnCollapseChanged(Runnable onCollapseChanged) {
         this.onCollapseChanged = onCollapseChanged;
+    }
+
+    /**
+     * Programmatically set the collapsed state without triggering a full panel rebuild.
+     */
+    void setCollapsedState(boolean collapsed) {
+        this.initialCollapsed = collapsed;
+        if (collapsed) {
+            dropDetailPanel.setVisible(false);
+            summaryPanelTitle.setForeground(COLLAPSED_ORANGE);
+            dropValueLabel.setForeground(COLLAPSED_ORANGE);
+        } else {
+            dropDetailPanel.setVisible(true);
+            summaryPanelTitle.setForeground(Color.ORANGE);
+            dropValueLabel.setForeground(Color.ORANGE);
+        }
+        updateCollapseState(collapsed);
     }
 }
