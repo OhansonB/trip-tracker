@@ -25,6 +25,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     private EnhancedLootTrackerPlugin parentPlugin;
     private JPanel lootBoxPanel;
+    private JPanel layoutPanel;
     private final int DEFAULT_TRACKING_MODE = 0;
     protected int selectedTrackingMode = DEFAULT_TRACKING_MODE;
     private static final ImageIcon GROUPED_MODE_ICON;
@@ -78,6 +79,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private JTextField filterField;
     private JPanel filterPanel;
     private JTextField tripFilterField;
+    private boolean showHidden = false;
 
     EnhancedLootTrackerPanel() {
         setBorder(new EmptyBorder(6, 6, 6, 6));
@@ -85,7 +87,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         setLayout(new BorderLayout());
 
         // Create layout panel for wrapping
-        JPanel layoutPanel = new JPanel();
+        layoutPanel = new JPanel();
         layoutPanel.setLayout(new BoxLayout(layoutPanel, BoxLayout.Y_AXIS));
         add(layoutPanel, BorderLayout.NORTH);
 
@@ -103,7 +105,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         filterPanel.setBorder(new EmptyBorder(4, 0, 4, 0));
 
         // Collapse/Expand all buttons on the left
-        JPanel collapsePanel = new JPanel(new GridLayout(1, 2, 0, 0));
+        JPanel collapsePanel = new JPanel(new GridLayout(1, 3, 0, 0));
         collapsePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
         JButton collapseAllButton = new JButton("\u2212"); // minus sign
@@ -128,6 +130,24 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         expandAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         expandAllButton.addActionListener(e -> setAllCollapsed(false));
 
+        JButton showHiddenButton = new JButton("\u25CB"); // ○ (empty circle = hidden items not shown)
+        showHiddenButton.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+        showHiddenButton.setPreferredSize(new Dimension(22, 22));
+        showHiddenButton.setToolTipText("Show hidden items/NPCs");
+        showHiddenButton.getAccessibleContext().setAccessibleName("Toggle show hidden items");
+        showHiddenButton.setContentAreaFilled(false);
+        showHiddenButton.setBorderPainted(false);
+        showHiddenButton.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+        showHiddenButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        showHiddenButton.addActionListener(e -> {
+            showHidden = !showHidden;
+            showHiddenButton.setText(showHidden ? "\u25CF" : "\u25CB");
+            showHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
+            showHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
+            rebuildAfterLoad();
+        });
+
+        collapsePanel.add(showHiddenButton);
         collapsePanel.add(collapseAllButton);
         collapsePanel.add(expandAllButton);
 
@@ -175,7 +195,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     /**
      * Builds an inline filter field for trip view, placed below the TRIP TRACKERS header.
-     * Shares the same filterText state as the main filter.
+     * Uses a separate tripFilterText state from the main filter.
      */
     private JPanel buildTripFilterPanel() {
         JPanel panel = new JPanel(new BorderLayout());
@@ -183,7 +203,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         panel.setBorder(new EmptyBorder(0, 0, 4, 0));
 
         // Collapse/Expand all buttons on the left
-        JPanel collapsePanel = new JPanel(new GridLayout(1, 2, 0, 0));
+        JPanel collapsePanel = new JPanel(new GridLayout(1, 3, 0, 0));
         collapsePanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
         JButton collapseAllButton = new JButton("\u2212");
@@ -208,6 +228,24 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         expandAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         expandAllButton.addActionListener(e -> setAllCollapsed(false));
 
+        JButton tripShowHiddenButton = new JButton(showHidden ? "\u25CF" : "\u25CB");
+        tripShowHiddenButton.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+        tripShowHiddenButton.setPreferredSize(new Dimension(22, 22));
+        tripShowHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
+        tripShowHiddenButton.getAccessibleContext().setAccessibleName("Toggle show hidden items");
+        tripShowHiddenButton.setContentAreaFilled(false);
+        tripShowHiddenButton.setBorderPainted(false);
+        tripShowHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
+        tripShowHiddenButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        tripShowHiddenButton.addActionListener(e -> {
+            showHidden = !showHidden;
+            tripShowHiddenButton.setText(showHidden ? "\u25CF" : "\u25CB");
+            tripShowHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
+            tripShowHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
+            rebuildAfterLoad();
+        });
+
+        collapsePanel.add(tripShowHiddenButton);
         collapsePanel.add(collapseAllButton);
         collapsePanel.add(expandAllButton);
 
@@ -272,6 +310,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                     }
                     lootBoxPanel.add(tripPanel.buildHeaderPanel(), 2);
                     tripPanelBoxes.get(tripId).forEach((bKey, bValue) -> {
+                        // Skip excluded NPCs (unless showing hidden)
+                        if (!showHidden && parentPlugin.isNpcExcluded(bKey)) {
+                            return;
+                        }
                         LootTrackingPanelBox panelBox = tripPanelBoxes.get(tripId).get(bKey);
                         JPanel panel = panelBox.buildPanelBox();
                         panel.setName(bKey);
@@ -524,12 +566,23 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         if (!filterText.isEmpty() && !itemDrop.getDropNpcName().toLowerCase().contains(filterText)) {
             return;
         }
+        // Apply NPC exclusion filter (unless showing hidden)
+        if (!showHidden && parentPlugin.isNpcExcluded(itemDrop.getDropNpcName())) {
+            return;
+        }
         LootTrackingPanelBox newDropBox = new LootTrackingPanelBox(itemDrop, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
         newDropBox.setOnCollapseChanged(() -> parentPlugin.onDropCollapseChanged());
+        newDropBox.setParentPlugin(parentPlugin);
+        if (!showHidden) {
+            newDropBox.setExcludedItems(parentPlugin.getExcludedItems());
+        }
         listViewPanelBoxes.add(0, newDropBox);
         lootBoxPanel.add(newDropBox.buildPanelBox(),0);
-        lootBoxPanel.revalidate();
-        lootBoxPanel.repaint();
+        // Only repaint if the panel is already attached (skip during off-screen rebuild)
+        if (lootBoxPanel.getParent() != null) {
+            lootBoxPanel.revalidate();
+            lootBoxPanel.repaint();
+        }
     }
 
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, int tripId) {
@@ -541,6 +594,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             npcLootAggregate.collapsed = !npcLootAggregate.collapsed;
             parentPlugin.onTripStatusChanged();
         }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
+        newDropBox.setParentPlugin(parentPlugin);
+        if (!showHidden) {
+            newDropBox.setExcludedItems(parentPlugin.getExcludedItems());
+        }
         JPanel newLootPanel = newDropBox.buildPanelBox();
         newLootPanel.setName(npcName);
 
@@ -583,6 +640,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     // This method is used for adding a loot box when in grouped view mode
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation) {
         String npcName = npcLootAggregate.getNpcName();
+
+        // Apply NPC exclusion filter (unless showing hidden)
+        if (!showHidden && parentPlugin.isNpcExcluded(npcName)) {
+            return;
+        }
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
 
@@ -596,6 +658,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             }
             parentPlugin.onGroupedCollapseChanged();
         }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
+        newDropBox.setParentPlugin(parentPlugin);
+        if (!showHidden) {
+            newDropBox.setExcludedItems(parentPlugin.getExcludedItems());
+        }
         JPanel newLootPanel = newDropBox.buildPanelBox();
 
         if (groupedLootBoxPanels.containsKey(npcName)) {
@@ -616,8 +682,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 return;
             }
             lootBoxPanel.add(newLootPanel, 0);
-            lootBoxPanel.revalidate();
-            lootBoxPanel.repaint();
+            // Only repaint if the panel is already attached (skip during off-screen rebuild)
+            if (lootBoxPanel.getParent() != null) {
+                lootBoxPanel.revalidate();
+                lootBoxPanel.repaint();
+            }
         }
     }
 
@@ -650,7 +719,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 if (collapsed) {
                     collapsedNpcs.addAll(groupedLootBoxPanels.keySet());
                 } else {
-                    collapsedNpcs.clear();
+                    // Only un-collapse visible NPCs, leave hidden NPCs' state intact
+                    collapsedNpcs.removeAll(groupedLootBoxPanels.keySet());
                 }
                 for (LootTrackingPanelBox box : groupedPanelBoxes.values()) {
                     box.setCollapsedState(collapsed);
@@ -685,34 +755,68 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
      * Called after persisted data has been loaded to refresh the current view.
      */
     public void rebuildAfterLoad() {
+        // Build a fresh loot box panel off-screen to avoid intermediate repaints
+        JPanel newLootBoxPanel = new JPanel();
+        newLootBoxPanel.setLayout(new BoxLayout(newLootBoxPanel, BoxLayout.Y_AXIS));
+
+        // Swap the reference so all rebuild methods populate the new panel
+        JPanel oldPanel = lootBoxPanel;
+        lootBoxPanel = newLootBoxPanel;
+
+        // Clear existing trip panel state to rebuild with current exclusion/display settings
+        tripsMap.clear();
+        tripPanelBoxes.clear();
+        listViewPanelBoxes.clear();
+        groupedLootBoxPanels.clear();
+        groupedPanelBoxes.clear();
+
+        // Preserve collapsed NPC state — the set may be indirectly cleared during rebuild
+        Set<String> savedCollapsedNpcs = new HashSet<>(collapsedNpcs);
+
         // Register restored trips so the trip view knows about them
         for (Trip trip : parentPlugin.getTrips()) {
             int id = trip.getTripId();
-            if (!tripsMap.containsKey(id)) {
-                TripPanel tripPanel = new TripPanel(trip);
-                tripsMap.put(id, tripPanel);
-
-                // Build loot panel boxes from the trip's restored NPC aggregates
-                LinkedHashMap<String, LootTrackingPanelBox> lootPanels = new LinkedHashMap<>();
-                for (NpcLootAggregate aggregate : trip.getTripAggregates()) {
-                    String npcName = aggregate.getNpcName();
-                    int kills = aggregate.getNumberOfKills();
-                    String lastKill = aggregate.getLastKillTime();
-                    ArrayList<LootAggregation> aggregations = aggregate.getNpcItemAggregations();
-
-                    if (aggregations != null) {
-                        LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill, aggregate.collapsed, () -> {
-                            aggregate.collapsed = !aggregate.collapsed;
-                            parentPlugin.onTripStatusChanged();
-                        }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
-                        lootPanels.put(npcName, panelBox);
-                    }
-                }
-                tripPanelBoxes.put(id, lootPanels);
+            TripPanel tripPanel = new TripPanel(trip);
+            if (!showHidden) {
+                tripPanel.setExcludedItems(parentPlugin.getExcludedItems());
+                tripPanel.setExcludedNpcs(parentPlugin.getExcludedNpcs());
             }
+            tripsMap.put(id, tripPanel);
+
+            // Build loot panel boxes from the trip's restored NPC aggregates
+            LinkedHashMap<String, LootTrackingPanelBox> lootPanels = new LinkedHashMap<>();
+            for (NpcLootAggregate aggregate : trip.getTripAggregates()) {
+                String npcName = aggregate.getNpcName();
+                int kills = aggregate.getNumberOfKills();
+                String lastKill = aggregate.getLastKillTime();
+                ArrayList<LootAggregation> aggregations = aggregate.getNpcItemAggregations();
+
+                if (aggregations != null) {
+                    LootTrackingPanelBox panelBox = new LootTrackingPanelBox(aggregations, npcName, kills, lastKill, aggregate.collapsed, () -> {
+                        aggregate.collapsed = !aggregate.collapsed;
+                        parentPlugin.onTripStatusChanged();
+                    }, parentPlugin.getItemManager(), parentPlugin.isSpriteDisplayMode());
+                    panelBox.setParentPlugin(parentPlugin);
+                    if (!showHidden) {
+                        panelBox.setExcludedItems(parentPlugin.getExcludedItems());
+                    }
+                    lootPanels.put(npcName, panelBox);
+                }
+            }
+            tripPanelBoxes.put(id, lootPanels);
         }
 
+        // Restore collapsed NPC state before rebuilding
+        collapsedNpcs = savedCollapsedNpcs;
+
         rebuildLootPanel();
+
+        // Swap the old panel for the new one in a single operation
+        int index = layoutPanel.getComponentZOrder(oldPanel);
+        layoutPanel.remove(oldPanel);
+        layoutPanel.add(lootBoxPanel, index);
+        layoutPanel.revalidate();
+        layoutPanel.repaint();
     }
 
     private void createNewTrip() {
@@ -724,6 +828,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
             Trip activeTrip = parentPlugin.getActiveTrip();
             TripPanel tripPanel = new TripPanel(activeTrip);
+            if (!showHidden) {
+                tripPanel.setExcludedItems(parentPlugin.getExcludedItems());
+                tripPanel.setExcludedNpcs(parentPlugin.getExcludedNpcs());
+            }
             tripsMap.put(activeTrip.getTripId(), tripPanel);
 
             activeTripLootPanels = new LinkedHashMap<>();
@@ -849,7 +957,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         setBorder(new EmptyBorder(6, 6, 6, 6));
         setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-        JPanel layoutPanel = new JPanel();
+        layoutPanel = new JPanel();
         layoutPanel.setLayout(new BoxLayout(layoutPanel, BoxLayout.Y_AXIS));
         add(layoutPanel, BorderLayout.NORTH);
 

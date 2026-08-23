@@ -68,6 +68,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private net.runelite.client.callback.ClientThread clientThread;
 	@Inject
 	private ChatMessageManager chatMessageManager;
+	@Inject
+	private ConfigManager configManager;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
 	private static final Pattern CLUE_SCROLL_PATTERN = Pattern.compile("You have completed (\\d+) ([a-z]+) Treasure Trails?\\.");
 
@@ -176,7 +178,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		PICKPOCKET_COIN_VALUES.put("TzHaar-Hur", 80);
 	}
 	private String lastPickpocketTarget;
-	private Multiset<Integer> inventorySnapshot;
 	private Multiset<Integer> referenceInventorySnapshot;
 	private Multiset<Integer> previousReferenceInventorySnapshot;
 	private EnhancedLootTrackerPanel panel;
@@ -204,8 +205,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Subscribe
 	public void onConfigChanged(net.runelite.client.events.ConfigChanged event) {
-		if ("triptracker".equals(event.getGroup()) && "spriteDisplayMode".equals(event.getKey())) {
-			SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+		if ("triptracker".equals(event.getGroup())) {
+			String key = event.getKey();
+			if ("spriteDisplayMode".equals(key) || "excludedItems".equals(key) || "excludedNpcs".equals(key)) {
+				SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+			}
 		}
 	}
 
@@ -1218,9 +1222,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 						String npcName = npcAggregate.getNpcName();
 						ArrayList<LootAggregation> npcsLootAggregation = npcAggregate.getNpcItemAggregations();
 						if (npcsLootAggregation != null) {
-							final NpcLootAggregate aggRef = npcAggregate;
-							final ArrayList<LootAggregation> aggList = npcsLootAggregation;
-							SwingUtilities.invokeLater(() -> panel.addLootBox(aggRef, aggList));
+							panel.addLootBox(npcAggregate, npcsLootAggregation);
 						}
 					}
 				}
@@ -1233,10 +1235,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				log.warn("Unsupported view mode: {}", panel.getSelectedTrackingMode());
 				break;
 		}
-	}
-
-	public ArrayList<LootAggregation> getAggregation(String npcName) {
-		return getNpcAggregate(npcName).getNpcItemAggregations();
 	}
 
 	public List<Trip> getTrips() {
@@ -1282,6 +1280,121 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	public boolean isSpriteDisplayMode() {
 		return config.spriteDisplayMode();
+	}
+
+	// --- Exclusion helpers ---
+
+	/**
+	 * Returns the set of excluded item names (lowercase, trimmed) from config.
+	 */
+	public Set<String> getExcludedItems() {
+		return parseCommaSeparated(config.excludedItems());
+	}
+
+	/**
+	 * Returns the set of excluded NPC names (lowercase, trimmed) from config.
+	 */
+	public Set<String> getExcludedNpcs() {
+		return parseCommaSeparated(config.excludedNpcs());
+	}
+
+	/**
+	 * Adds an item name to the excluded items config list.
+	 */
+	public void addExcludedItem(String itemName) {
+		String current = config.excludedItems();
+		String updated = appendToCommaSeparated(current, itemName);
+		configManager.setConfiguration("triptracker", "excludedItems", updated);
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+	}
+
+	/**
+	 * Adds an NPC name to the excluded NPCs config list.
+	 */
+	public void addExcludedNpc(String npcName) {
+		String current = config.excludedNpcs();
+		String updated = appendToCommaSeparated(current, npcName);
+		configManager.setConfiguration("triptracker", "excludedNpcs", updated);
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+	}
+
+	/**
+	 * Checks if an item name is in the exclusion list.
+	 */
+	public boolean isItemExcluded(String itemName) {
+		return getExcludedItems().contains(itemName.toLowerCase().trim());
+	}
+
+	/**
+	 * Checks if an NPC name is in the exclusion list.
+	 */
+	public boolean isNpcExcluded(String npcName) {
+		return getExcludedNpcs().contains(npcName.toLowerCase().trim());
+	}
+
+	/**
+	 * Removes an item name from the excluded items config list.
+	 */
+	public void removeExcludedItem(String itemName) {
+		String updated = removeFromCommaSeparated(config.excludedItems(), itemName);
+		configManager.setConfiguration("triptracker", "excludedItems", updated);
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+	}
+
+	/**
+	 * Removes an NPC name from the excluded NPCs config list.
+	 */
+	public void removeExcludedNpc(String npcName) {
+		String updated = removeFromCommaSeparated(config.excludedNpcs(), npcName);
+		configManager.setConfiguration("triptracker", "excludedNpcs", updated);
+		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
+	}
+
+	private Set<String> parseCommaSeparated(String value) {
+		Set<String> result = new HashSet<>();
+		if (value == null || value.trim().isEmpty()) {
+			return result;
+		}
+		for (String entry : value.split(",")) {
+			String trimmed = entry.trim().toLowerCase();
+			if (!trimmed.isEmpty()) {
+				result.add(trimmed);
+			}
+		}
+		return result;
+	}
+
+	private String appendToCommaSeparated(String current, String newEntry) {
+		String trimmed = newEntry.trim();
+		if (trimmed.isEmpty()) {
+			return current;
+		}
+		// Check if already present (case-insensitive)
+		Set<String> existing = parseCommaSeparated(current);
+		if (existing.contains(trimmed.toLowerCase())) {
+			return current;
+		}
+		if (current == null || current.trim().isEmpty()) {
+			return trimmed;
+		}
+		return current.trim() + ", " + trimmed;
+	}
+
+	private String removeFromCommaSeparated(String current, String entry) {
+		if (current == null || current.trim().isEmpty()) {
+			return "";
+		}
+		String[] parts = current.split(",");
+		StringBuilder result = new StringBuilder();
+		for (String part : parts) {
+			if (!part.trim().equalsIgnoreCase(entry.trim())) {
+				if (result.length() > 0) {
+					result.append(", ");
+				}
+				result.append(part.trim());
+			}
+		}
+		return result.toString();
 	}
 
 	/**

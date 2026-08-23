@@ -33,6 +33,14 @@ public interface EnhancedLootTrackerConfig extends Config {
 	)
 	String debugSection = "debug";
 
+	@ConfigSection(
+			name = "Exclusions",
+			description = "Hide specific items or NPCs from all views (data is still tracked)",
+			position = 3,
+			closedByDefault = true
+	)
+	String exclusionsSection = "exclusions";
+
 	// --- Display ---
 
 	@ConfigItem(
@@ -112,5 +120,31 @@ public interface EnhancedLootTrackerConfig extends Config {
 	default boolean debugMode()
 	{
 		return false;
+	}
+
+	// --- Exclusions ---
+
+	@ConfigItem(
+			position = 0,
+			keyName = "excludedItems",
+			name = "Excluded items",
+			description = "Comma-separated list of item names to hide from all views (e.g. Bones, Ashes). Case-insensitive.",
+			section = exclusionsSection
+	)
+	default String excludedItems()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+			position = 1,
+			keyName = "excludedNpcs",
+			name = "Excluded NPCs",
+			description = "Comma-separated list of NPC names to hide from all views (e.g. Man, Woman). Case-insensitive.",
+			section = exclusionsSection
+	)
+	default String excludedNpcs()
+	{
+		return "";
 	}
 }

@@ -23,6 +23,8 @@ public class LootTrackingPanelBox extends JPanel {
 
     private TrackableItemDrop itemDrop;
     private final int boxType;
+    private Set<String> excludedItems = new HashSet<>();
+    private EnhancedLootTrackerPlugin parentPlugin;
     private int numberOfKills;
     private String npcName;
     private long totalGeValue;
@@ -115,11 +117,23 @@ public class LootTrackingPanelBox extends JPanel {
         switch (boxType) {
             case 0:
                 summaryPanelTitle.setText(itemDrop.getDropNpcName() + " (lvl " + itemDrop.getDropNpcLevel() + ")");
-                dropValueLabel.setText(FormatUtil.shortenNumber(itemDrop.getTotalDropGeValue()) + " gp");
                 dropTimeDateLabel.setText(itemDrop.getDateFromLong(itemDrop.getDropTimeDate()));
 
                 ArrayList<TrackableDroppedItem> droppedItems = itemDrop.getDroppedItems();
                 Collections.sort(droppedItems);
+
+                // Filter excluded items and calculate adjusted value
+                long adjustedGeValue = itemDrop.getTotalDropGeValue();
+                if (!excludedItems.isEmpty()) {
+                    droppedItems = new ArrayList<>(droppedItems);
+                    for (TrackableDroppedItem excluded : new ArrayList<>(droppedItems)) {
+                        if (excludedItems.contains(excluded.getItemName().toLowerCase().trim())) {
+                            adjustedGeValue -= excluded.getTotalGePrice();
+                        }
+                    }
+                    droppedItems.removeIf(item -> excludedItems.contains(item.getItemName().toLowerCase().trim()));
+                }
+                dropValueLabel.setText(FormatUtil.shortenNumber(adjustedGeValue) + " gp");
 
                 if (spriteMode && itemManager != null) {
                     buildSpriteGrid(droppedItems, droppedItemsPanel);
@@ -133,6 +147,17 @@ public class LootTrackingPanelBox extends JPanel {
                         droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                         droppedItemNameLabel.setForeground(Color.WHITE);
                         droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
+                        final String itemNameForMenu = item.getItemName();
+                        droppedItemNameLabel.addMouseListener(new MouseAdapter() {
+                            @Override
+                            public void mousePressed(MouseEvent e) {
+                                if (e.isPopupTrigger()) showItemContextMenu(e, droppedItemNameLabel, itemNameForMenu);
+                            }
+                            @Override
+                            public void mouseReleased(MouseEvent e) {
+                                if (e.isPopupTrigger()) showItemContextMenu(e, droppedItemNameLabel, itemNameForMenu);
+                            }
+                        });
                         droppedItemsPanel.add(droppedItemNameLabel, gbc);
 
                         gbc.gridx = 1;
@@ -152,15 +177,28 @@ public class LootTrackingPanelBox extends JPanel {
                 break;
             case 1:
                 summaryPanelTitle.setText(npcName + " x" + numberOfKills);
-                dropValueLabel.setText(FormatUtil.shortenNumber(totalGeValue) + " gp");
                 dropTimeDateLabel.setText("Last kill at: " + lastKillTimeFormatted);
 
                 Collections.sort(lootAggregations);
 
+                // Filter excluded items and calculate adjusted value
+                ArrayList<LootAggregation> displayAggregations = lootAggregations;
+                long adjustedGroupedValue = totalGeValue;
+                if (!excludedItems.isEmpty()) {
+                    displayAggregations = new ArrayList<>(lootAggregations);
+                    for (LootAggregation agg : lootAggregations) {
+                        if (excludedItems.contains(agg.getItemName().toLowerCase().trim())) {
+                            adjustedGroupedValue -= agg.getTotalGePrice();
+                        }
+                    }
+                    displayAggregations.removeIf(agg -> excludedItems.contains(agg.getItemName().toLowerCase().trim()));
+                }
+                dropValueLabel.setText(FormatUtil.shortenNumber(adjustedGroupedValue) + " gp");
+
                 if (spriteMode && itemManager != null) {
-                    buildAggregateSpriteGrid(lootAggregations, droppedItemsPanel);
+                    buildAggregateSpriteGrid(displayAggregations, droppedItemsPanel);
                 } else {
-                    for (LootAggregation lootAggregation : lootAggregations) {
+                    for (LootAggregation lootAggregation : displayAggregations) {
                         gbc.gridx = 0;
                         gbc.anchor = GridBagConstraints.LINE_START;
 
@@ -172,6 +210,17 @@ public class LootTrackingPanelBox extends JPanel {
                         droppedItemNameLabel.setFont(FontManager.getRunescapeSmallFont());
                         droppedItemNameLabel.setForeground(Color.WHITE);
                         droppedItemNameLabel.setBorder(new EmptyBorder(2, 5, 4, 5));
+                        final String aggItemNameForMenu = itemName;
+                        droppedItemNameLabel.addMouseListener(new MouseAdapter() {
+                            @Override
+                            public void mousePressed(MouseEvent e) {
+                                if (e.isPopupTrigger()) showItemContextMenu(e, droppedItemNameLabel, aggItemNameForMenu);
+                            }
+                            @Override
+                            public void mouseReleased(MouseEvent e) {
+                                if (e.isPopupTrigger()) showItemContextMenu(e, droppedItemNameLabel, aggItemNameForMenu);
+                            }
+                        });
                         droppedItemsPanel.add(droppedItemNameLabel, gbc);
 
                         gbc.gridx = 1;
@@ -241,6 +290,20 @@ public class LootTrackingPanelBox extends JPanel {
                     toggleCollapse();
                 }
             }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    showNpcContextMenu(e, innerSummaryPanel);
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    showNpcContextMenu(e, innerSummaryPanel);
+                }
+            }
         });
         innerSummaryPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         outerPanel.add(innerSummaryPanel, BorderLayout.NORTH);
@@ -305,6 +368,17 @@ public class LootTrackingPanelBox extends JPanel {
                 itemImage.addTo(imageLabel);
 
                 imageLabel.setToolTipText(buildItemTooltip(item.getItemName(), item.getQuantity(), item.getTotalGePrice()));
+                final String spriteItemName = item.getItemName();
+                imageLabel.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        if (e.isPopupTrigger()) showItemContextMenu(e, imageLabel, spriteItemName);
+                    }
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        if (e.isPopupTrigger()) showItemContextMenu(e, imageLabel, spriteItemName);
+                    }
+                });
                 slotContainer.add(imageLabel);
             }
 
@@ -332,6 +406,17 @@ public class LootTrackingPanelBox extends JPanel {
                 itemImage.addTo(imageLabel);
 
                 imageLabel.setToolTipText(buildItemTooltip(item.getItemName(), item.getQuantity(), item.getTotalGePrice()));
+                final String aggSpriteItemName = item.getItemName();
+                imageLabel.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        if (e.isPopupTrigger()) showItemContextMenu(e, imageLabel, aggSpriteItemName);
+                    }
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        if (e.isPopupTrigger()) showItemContextMenu(e, imageLabel, aggSpriteItemName);
+                    }
+                });
                 slotContainer.add(imageLabel);
             }
 
@@ -386,6 +471,14 @@ public class LootTrackingPanelBox extends JPanel {
         this.onCollapseChanged = onCollapseChanged;
     }
 
+    void setExcludedItems(Set<String> excludedItems) {
+        this.excludedItems = excludedItems != null ? excludedItems : new HashSet<>();
+    }
+
+    void setParentPlugin(EnhancedLootTrackerPlugin plugin) {
+        this.parentPlugin = plugin;
+    }
+
     /**
      * Programmatically set the collapsed state without triggering a full panel rebuild.
      */
@@ -400,6 +493,50 @@ public class LootTrackingPanelBox extends JPanel {
             summaryPanelTitle.setForeground(Color.ORANGE);
             dropValueLabel.setForeground(Color.ORANGE);
         }
-        updateCollapseState(collapsed);
+        // Don't fire onCollapseChanged — this is a programmatic update, not a user toggle.
+        // The caller is responsible for updating any external state (collapsedNpcs, persistence).
+        if (boxType == 0 && itemDrop != null) {
+            itemDrop.setCollapsed(collapsed);
+        }
+    }
+
+    private void showNpcContextMenu(MouseEvent e, JPanel source) {
+        if (parentPlugin == null) {
+            return;
+        }
+        String npcNameToHide = (boxType == 0) ? itemDrop.getDropNpcName() : npcName;
+        if (npcNameToHide == null || npcNameToHide.isEmpty()) {
+            return;
+        }
+
+        JPopupMenu menu = new JPopupMenu();
+        if (parentPlugin.isNpcExcluded(npcNameToHide)) {
+            JMenuItem unhideNpc = new JMenuItem("Unhide \"" + npcNameToHide + "\"");
+            unhideNpc.addActionListener(ev -> parentPlugin.removeExcludedNpc(npcNameToHide));
+            menu.add(unhideNpc);
+        } else {
+            JMenuItem hideNpc = new JMenuItem("Hide \"" + npcNameToHide + "\"");
+            hideNpc.addActionListener(ev -> parentPlugin.addExcludedNpc(npcNameToHide));
+            menu.add(hideNpc);
+        }
+        menu.show(source, e.getX(), e.getY());
+    }
+
+    private void showItemContextMenu(MouseEvent e, JComponent source, String itemName) {
+        if (parentPlugin == null || itemName == null || itemName.isEmpty()) {
+            return;
+        }
+
+        JPopupMenu menu = new JPopupMenu();
+        if (parentPlugin.isItemExcluded(itemName)) {
+            JMenuItem unhideItem = new JMenuItem("Unhide \"" + itemName + "\"");
+            unhideItem.addActionListener(ev -> parentPlugin.removeExcludedItem(itemName));
+            menu.add(unhideItem);
+        } else {
+            JMenuItem hideItem = new JMenuItem("Hide \"" + itemName + "\"");
+            hideItem.addActionListener(ev -> parentPlugin.addExcludedItem(itemName));
+            menu.add(hideItem);
+        }
+        menu.show(source, e.getX(), e.getY());
     }
 }

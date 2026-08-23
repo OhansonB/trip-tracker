@@ -11,6 +11,8 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Swing UI panel for displaying and controlling a Trip.
@@ -31,6 +33,8 @@ public class TripPanel {
     private JPanel lootPanel;
     private JPanel headerPanel;
     private Timer statsTimer;
+    private Set<String> excludedItems = new HashSet<>();
+    private Set<String> excludedNpcs = new HashSet<>();
 
     public TripPanel(Trip trip) {
         this.trip = trip;
@@ -71,9 +75,9 @@ public class TripPanel {
         contentPanel.add(summaryPanelTitle);
 
         // Inline stats: kills | value | gp/hr | duration
-        String statsText = trip.getTripKills() + " kills \u2022 " +
-                FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
-                FormatUtil.shortenNumber(trip.getGpPerHour()) + " gp/hr \u2022 " +
+        String statsText = getAdjustedKills() + " kills \u2022 " +
+                FormatUtil.shortenNumber(getAdjustedTripValue()) + " gp \u2022 " +
+                FormatUtil.shortenNumber(getAdjustedGpPerHour()) + " gp/hr \u2022 " +
                 trip.calculateTripDuration();
         statsLabel = new JLabel(statsText);
         statsLabel.setFont(FontManager.getRunescapeSmallFont());
@@ -284,9 +288,9 @@ public class TripPanel {
      */
     public void updateStats() {
         if (statsLabel != null) {
-            String statsText = trip.getTripKills() + " kills \u2022 " +
-                    FormatUtil.shortenNumber(trip.getTripValue()) + " gp \u2022 " +
-                    FormatUtil.shortenNumber(trip.getGpPerHour()) + " gp/hr \u2022 " +
+            String statsText = getAdjustedKills() + " kills \u2022 " +
+                    FormatUtil.shortenNumber(getAdjustedTripValue()) + " gp \u2022 " +
+                    FormatUtil.shortenNumber(getAdjustedGpPerHour()) + " gp/hr \u2022 " +
                     trip.calculateTripDuration();
             statsLabel.setText(statsText);
         }
@@ -343,5 +347,56 @@ public class TripPanel {
             statsLabel.setForeground(Color.WHITE);
         }
         trip.setCollapsed(collapsed);
+    }
+
+    public void setExcludedItems(Set<String> excludedItems) {
+        this.excludedItems = excludedItems != null ? excludedItems : new HashSet<>();
+    }
+
+    public void setExcludedNpcs(Set<String> excludedNpcs) {
+        this.excludedNpcs = excludedNpcs != null ? excludedNpcs : new HashSet<>();
+    }
+
+    private long getAdjustedTripValue() {
+        if (excludedItems.isEmpty() && excludedNpcs.isEmpty()) {
+            return trip.getTripValue();
+        }
+        long excluded = 0;
+        for (NpcLootAggregate agg : trip.getTripAggregates()) {
+            if (excludedNpcs.contains(agg.getNpcName().toLowerCase().trim())) {
+                for (TrackableDroppedItem item : agg.getDroppedItems()) {
+                    excluded += item.getTotalGePrice();
+                }
+            } else {
+                for (TrackableDroppedItem item : agg.getDroppedItems()) {
+                    if (excludedItems.contains(item.getItemName().toLowerCase().trim())) {
+                        excluded += item.getTotalGePrice();
+                    }
+                }
+            }
+        }
+        return trip.getTripValue() - excluded;
+    }
+
+    private int getAdjustedKills() {
+        if (excludedNpcs.isEmpty()) {
+            return trip.getTripKills();
+        }
+        int excluded = 0;
+        for (NpcLootAggregate agg : trip.getTripAggregates()) {
+            if (excludedNpcs.contains(agg.getNpcName().toLowerCase().trim())) {
+                excluded += agg.getNumberOfKills();
+            }
+        }
+        return trip.getTripKills() - excluded;
+    }
+
+    private long getAdjustedGpPerHour() {
+        long adjustedValue = getAdjustedTripValue();
+        long durationSeconds = trip.getDurationSeconds();
+        if (durationSeconds <= 0) {
+            return 0;
+        }
+        return (adjustedValue * 3600L) / durationSeconds;
     }
 }

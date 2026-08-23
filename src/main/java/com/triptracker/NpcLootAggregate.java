@@ -80,14 +80,6 @@ public class NpcLootAggregate {
             }
         }
 
-        // Debug: log aggregation map state
-        StringBuilder sb = new StringBuilder("AggMap for " + npcName + ": ");
-        for (Map.Entry<Integer, LootAggregation> e : aggregationMap.entrySet()) {
-            sb.append(e.getKey()).append("=").append(e.getValue().getItemName())
-              .append("x").append(e.getValue().getQuantity()).append(", ");
-        }
-        System.out.println(sb.toString());
-
         this.lootAggregations = new ArrayList<>(aggregationMap.values());
     }
 
