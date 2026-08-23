@@ -101,7 +101,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	// Flag for bird nest search inventory diff
 	private boolean awaitingBirdNestDiff;
 	private ScheduledFuture<?> birdNestDebounceTimer;
-	private static final long BIRD_NEST_DEBOUNCE_MS = 1200; // ~2 game ticks to catch auto-searched nests
+	private static final long BIRD_NEST_DEBOUNCE_MS = 2000; // resets on each nest; expires when no more arrive
 
 	// Items to exclude from farming harvest tracking (not actual harvests)
 	private static final Set<Integer> FARMING_EXCLUDED_ITEM_IDS = new HashSet<>(Arrays.asList(
@@ -630,7 +630,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			} else if (awaitingBirdNestDiff) {
 				// Process bird nest search loot diff
-				// Don't clear the flag yet — auto-searched nests may follow on subsequent ticks
+				// Don't clear the flag — auto-searched nests follow on subsequent ticks
 
 				Multiset<Integer> newItems = compareInventorySnapshot(currentSnapshot, preLootInventorySnapshot);
 
