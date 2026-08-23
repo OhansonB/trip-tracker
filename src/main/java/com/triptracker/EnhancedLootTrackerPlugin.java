@@ -186,6 +186,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private boolean pickpocketHasOccurred;
 	private boolean chestLooted;
 	private TripStorageService storageService;
+	private long currentAccountHash = -1; // Tracks the currently loaded account
 
 	// Debounce persistence: save at most once every 5 seconds
 	private static final long SAVE_DEBOUNCE_MS = 5000;
@@ -229,9 +230,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				.build();
 
 		clientToolbar.addNavigation(navButton);
-
-		// Restore persisted data on the client thread (ItemManager requires it)
-		clientThread.invokeLater(this::loadPersistedData);
 	}
 
 	@Override
@@ -251,11 +249,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		debounceExecutor.shutdown();
 
 		// Persist data synchronously before shutdown, then clean up the executor
-		storageService.saveTripsSync(trips);
-		storageService.saveDropsSync(listViewDropArray);
-		storageService.saveLastSessionEpoch(System.currentTimeMillis());
+		if (currentAccountHash != -1) {
+			storageService.saveTripsSync(trips);
+			storageService.saveDropsSync(listViewDropArray);
+			storageService.saveLastSessionEpoch(System.currentTimeMillis());
+		}
 		storageService.shutdown();
 
+		currentAccountHash = -1;
 		clientToolbar.removeNavigation(navButton);
 	}
 
@@ -310,13 +311,54 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (event.getGameState() == GameState.LOADING) {
 			chestLooted = false;
 		}
+		if (event.getGameState() == GameState.LOGGED_IN) {
+			long accountHash = client.getAccountHash();
+			if (accountHash != -1 && accountHash != currentAccountHash) {
+				// Save current account's data before switching (if we had one loaded)
+				if (currentAccountHash != -1) {
+					storageService.saveTripsSync(trips);
+					storageService.saveDropsSync(listViewDropArray);
+					storageService.saveLastSessionEpoch(System.currentTimeMillis());
+				}
+
+				// Switch to the new account's data directory
+				currentAccountHash = accountHash;
+				storageService.switchAccount(accountHash);
+
+				// Clear in-memory state and reload from the new account's files
+				clearTrackingState();
+				loadPersistedData();
+			}
+		}
 		if (event.getGameState() == GameState.LOGIN_SCREEN) {
 			// Only reset snapshots when actually logged out, not on world hops or loading
 			referenceInventorySnapshot = null;
 			previousReferenceInventorySnapshot = null;
 			// Record logout time for trip inactivity checks
-			storageService.saveLastSessionEpoch(System.currentTimeMillis());
+			if (currentAccountHash != -1) {
+				storageService.saveLastSessionEpoch(System.currentTimeMillis());
+			}
 		}
+	}
+
+	/**
+	 * Clears all in-memory tracking state in preparation for loading a different account's data.
+	 */
+	private void clearTrackingState() {
+		synchronized (listViewDropArray) {
+			listViewDropArray.clear();
+		}
+		synchronized (npcLootAggregates) {
+			npcLootAggregates.clear();
+		}
+		synchronized (trips) {
+			trips.clear();
+		}
+		lastNpcKilled = null;
+		pickpocketHasOccurred = false;
+		awaitingLootDiff = false;
+		awaitingBirdNestDiff = false;
+		farmingHarvestInProgress = false;
 	}
 
 	@Subscribe

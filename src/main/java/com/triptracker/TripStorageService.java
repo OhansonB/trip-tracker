@@ -48,7 +48,8 @@ public class TripStorageService {
     private static final String DROPS_BASE = "drops";
 
     private final Gson gson;
-    private final File pluginDir;
+    private final File baseDir; // Root plugin directory (~/.runelite/trip-tracker/)
+    private File pluginDir;     // Active data directory (baseDir or baseDir/{accountHash}/)
     private final ExecutorService writeExecutor;
 
     public TripStorageService() {
@@ -57,6 +58,7 @@ public class TripStorageService {
 
     public TripStorageService(File pluginDir) {
         this.gson = new GsonBuilder().setPrettyPrinting().create();
+        this.baseDir = pluginDir;
         this.pluginDir = pluginDir;
         this.writeExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "trip-tracker-persistence");
@@ -66,6 +68,88 @@ public class TripStorageService {
 
         if (!pluginDir.exists()) {
             pluginDir.mkdirs();
+        }
+    }
+
+    // --- Account switching ---
+
+    /**
+     * Switches the active data directory to a character-specific subdirectory.
+     * If legacy files exist in the root dir but the account subdir is empty,
+     * copies them into the account subdir (one-time migration).
+     *
+     * @param accountHash the account's unique hash from client.getAccountHash()
+     */
+    public void switchAccount(long accountHash) {
+        File accountDir = new File(baseDir, String.valueOf(accountHash));
+        if (!accountDir.exists()) {
+            accountDir.mkdirs();
+        }
+
+        // One-time migration: if the account dir has no data files but the base dir does,
+        // copy them over (first login with character-specific tracking enabled)
+        migrateIfNeeded(accountDir);
+
+        this.pluginDir = accountDir;
+        log.debug("Switched storage to account directory: {}", accountDir.getAbsolutePath());
+    }
+
+    /**
+     * Returns the currently active data directory.
+     */
+    public File getActiveDirectory() {
+        return pluginDir;
+    }
+
+    /**
+     * Copies legacy data files from the base directory to the account directory
+     * if the account directory has no versioned data files yet.
+     */
+    private void migrateIfNeeded(File accountDir) {
+        // Check if the account dir already has data (any version of drops or trips)
+        boolean hasDrops = false;
+        boolean hasTrips = false;
+        for (int v = CURRENT_VERSION; v >= 0; v--) {
+            if (new File(accountDir, versionedFileName(DROPS_BASE, v)).exists()) {
+                hasDrops = true;
+            }
+            if (new File(accountDir, versionedFileName(TRIPS_BASE, v)).exists()) {
+                hasTrips = true;
+            }
+        }
+
+        if (hasDrops || hasTrips) {
+            // Account already has data — no migration needed
+            return;
+        }
+
+        // Check if legacy files exist in the base directory
+        String[] filesToMigrate = {
+                versionedFileName(DROPS_BASE, CURRENT_VERSION),
+                versionedFileName(DROPS_BASE, 0),
+                versionedFileName(TRIPS_BASE, CURRENT_VERSION),
+                versionedFileName(TRIPS_BASE, 0),
+                COLLAPSED_NPCS_FILE_NAME,
+                SESSION_FILE_NAME
+        };
+
+        boolean migrated = false;
+        for (String fileName : filesToMigrate) {
+            File source = new File(baseDir, fileName);
+            if (source.exists()) {
+                File dest = new File(accountDir, fileName);
+                try {
+                    Files.copy(source.toPath(), dest.toPath());
+                    migrated = true;
+                    log.debug("Migrated {} to account directory", fileName);
+                } catch (IOException e) {
+                    log.warn("Failed to migrate {} to account directory", fileName, e);
+                }
+            }
+        }
+
+        if (migrated) {
+            log.info("Migrated existing tracking data to character-specific directory: {}", accountDir.getName());
         }
     }
 
