@@ -17,9 +17,6 @@ Real-time filter text field (substring, case-insensitive) at the top of list and
 ### 5. ~~Trip filter in trip view~~ ✅ Done
 Same filter field in trip view filters by trip title instead of NPC name. Typing "demonic" shows only trips with "demonic" in the name.
 
-### 6. Configurable item highlighting (text mode)
-When in text-list mode, allow users to configure a GP threshold (e.g., 50k+). Items exceeding that value are highlighted in a different color (e.g., green or gold) to make valuable drops stand out at a glance.
-
 ### 7. Damage/prayer stats per trip
 Track damage dealt, damage received, and prayer points used/restored during a trip. Would require subscribing to:
 - `HitsplatApplied` event for damage dealt/received
@@ -40,32 +37,14 @@ Accessed via right-click → "Details" on a trip header.
 
 Fixed by normalizing noted item IDs to unnoted form in inventory snapshots, and merging bird nest variants by display name.
 
-### 10. Exclude certain items / monsters from drops and trips
-**Behaviour:** This is a visibility filter, not a hard exclude. All data is still tracked and persisted, but hidden items/monsters are filtered from the UI.
+### 10. ~~Exclude certain items / monsters from drops and trips~~ ✅ Done
+Visibility filter via comma-separated config strings (Exclusions section in plugin settings). Right-click any item or NPC header to "Hide" it; toggle show-hidden button (○/●) to reveal excluded entries temporarily. Right-click to "Unhide" when shown. Values, kills, and GP/hr all adjust to exclude hidden items/NPCs.
 
-- **Item exclusion:** Global "never show this item" list (e.g., ashes, bones). Configured via a text list in plugin settings. Items matching the list are hidden from all views but still saved to disk.
-- **Monster exclusion:** Global "never show drops from this NPC" list. Drops from excluded NPCs are hidden from all views but still persisted.
-- **Reversible:** If a user removes an item/monster from the exclusion list, previously hidden data reappears in the UI immediately (no data loss).
-- **Show hidden toggle:** A global "Show hidden" button in the panel that temporarily reveals all excluded items/monsters, allowing users to see the full picture when needed.
+### 12. ~~Export pretty print for e.g., Discord~~ ✅ Done
+Added "Pretty" option alongside CSV and JSON in the trip comparison view (Export: CSV | JSON | Pretty). Multi-line plain text format with kills, duration, value, GP/hr, GP/kill. All export formats and the comparison table now respect item/NPC exclusions.
 
-### 11. In Trip view, order within trip by value of NPC rather than by last killed
-Within a trip, NPC loot boxes should be sorted by total GP value contributed (highest value source at top), not by recency of kill. This makes it easy to see which source was most profitable during the trip at a glance.
-
-### 12. Export pretty print for e.g., Discord
-Extension of the existing trip comparison export (CSV/JSON). Adds a plain text export format suitable for pasting into Discord, Notepad, etc.
-
-- **Scope:** Trip view only — exports the selected trips from the comparison view.
-- **Format:** Plain text, monospace-friendly. No markdown or embed formatting needed.
-- **Content per trip:** Trip name, kills, duration (formatted as e.g., "1h 30m 29s"), total value, GP/hr, GP/kill. No start/end timestamps.
-- **Copied to clipboard** like the existing CSV/JSON exports.
-
-### 13. Character-specific tracking
-Separate data files per character so that e.g., an ironman and a main account don't contaminate each other's tracking history.
-
-- **Storage:** Each character gets its own `drops.json` and `trips.json` in a character-specific subdirectory (e.g., `~/.runelite/trip-tracker/<character-id>/`).
-- **Identification:** Ideally use an underlying account UUID if one is accessible via the RuneLite API or Jagex launcher integration. If no stable ID exists, fall back to player display name but handle name changes gracefully (e.g., store a mapping of name → ID, or prompt the user to merge when a name change is detected).
-- **Switching:** On login, automatically load the correct character's data. No manual switching required.
-- **Research needed:** Investigate whether `client.getAccountHash()` or similar provides a stable per-character identifier that survives name changes.
+### 13. ~~Character-specific tracking~~ ✅ Done
+Separate data files per character using `client.getAccountHash()` as a subdirectory under `~/.runelite/trip-tracker/{hash}/`. On login, the plugin detects the account, switches storage, and reloads. First login migrates legacy shared files into the account's directory. Handles character switching seamlessly.
 
 ### 14. ~~Exclude Clockwork from drop when collecting bird boxes~~ ✅ Done
 
@@ -81,10 +60,14 @@ Verified — clockwork is excluded at drop creation time in the inventory diff p
 ### 18. ~~When farming, exclude all item additions derived from snapshot except the herb in question.~~ ✅ Done
 Added all Crystal Teleport Seed charge variants (IDs 6099-6103, 23959, 23968) to `FARMING_EXCLUDED_ITEM_IDS` so using a teleport crystal during the debounce window no longer pollutes the harvest diff.
 
-### 19. Add collapse and expand all button on every view (list, group, trip)
+### 19. ~~Add collapse and expand all button on every view (list, group, trip)~~ ✅ Done
+Bold `−`/`+` buttons inline with the filter field on all views. List and grouped views collapse individual boxes; trip view collapses trip headers. NPC aggregate collapse states within trips persist correctly through view switches and collapse-all/expand-all.
 
 ### 20. ~~Add persistence to collapsed and expanded items~~ ✅ Done
 Collapse state is now persisted for all views: trips via `trips.json`, list drops via `drops.json`, grouped NPCs via `collapsed-npcs.json`.
+
+### 21. ~~Trip deletion causes visible panel redraw flicker~~ ✅ Done
+Fixed by: (1) hiding `lootBoxPanel` during rebuilds for list/grouped collapse-all and trip deletion, (2) using direct `setCollapsedState()` on TripPanel for trip-level collapse/expand (no rebuild at all), (3) trip deletion uses `rebuildTripEntries()` instead of full `rebuildLootPanel()`.
 
 ---
 
@@ -244,10 +227,8 @@ Collapse state is now persisted for all views: trips via `trips.json`, list drop
 |---|---------|--------|--------|-----------------|--------|
 | 16 | Disable farming in CoX | Bug fix | Low | 1st — prevents bad data being tracked now | ✅ Done |
 | 15 | Level-up mid-harvest fix | Bug fix | Low-Med | 2nd — known accuracy issue | ✅ Done |n
-| 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination | |
+| 13 | Character-specific tracking | Data integrity | Medium | 4th — prevents cross-account contamination | ✅ Done |
 | 3 | Trip persistence | QoL | Medium | 5th — common pain point | |
-| 11 | Trip sort by value | QoL | Low | 6th — quick win, better readability | |
-| 6 | Item highlighting | Visual | Low | 7th — quick win | |
 | 4 | NPC filter | QoL | Low | 8th — quick win | |
 | 5 | Trip filter | QoL | Low | 9th — quick win | |
 | 12 | Discord export | QoL | Low | 10th — quick win, extends existing export | |
