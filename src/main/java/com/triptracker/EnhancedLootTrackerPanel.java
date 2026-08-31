@@ -24,7 +24,8 @@ import java.util.Set;
 public class EnhancedLootTrackerPanel extends PluginPanel {
     private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
 
-    private final EnhancedLootTrackerPlugin parentPlugin;
+    @Inject
+    private EnhancedLootTrackerPlugin parentPlugin;
     private JPanel lootBoxPanel;
     private JPanel layoutPanel;
     private final int DEFAULT_TRACKING_MODE = 0;
@@ -83,8 +84,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private boolean showHidden = false;
 
     @Inject
-    EnhancedLootTrackerPanel(EnhancedLootTrackerPlugin parentPlugin) {
-        this.parentPlugin = parentPlugin;
+    EnhancedLootTrackerPanel() {
         setBorder(new EmptyBorder(6, 6, 6, 6));
         setBackground(ColorScheme.DARK_GRAY_COLOR);
         setLayout(new BorderLayout());
