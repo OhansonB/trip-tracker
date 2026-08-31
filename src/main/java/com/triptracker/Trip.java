@@ -62,27 +62,35 @@ public class Trip {
     }
 
     public void addNpcAggregateToTrip(NpcLootAggregate npcLootAggregate) {
-        if (contains(npcLootAggregate.getNpcName())) {
-            removeNpcAggregate(npcLootAggregate.getNpcName());
+        synchronized (npcAggregations) {
+            if (contains(npcLootAggregate.getNpcName())) {
+                removeNpcAggregate(npcLootAggregate.getNpcName());
+            }
+            npcAggregations.add(npcLootAggregate);
         }
-        npcAggregations.add(npcLootAggregate);
     }
 
     public ArrayList<NpcLootAggregate> getTripAggregates() {
-        return npcAggregations;
+        synchronized (npcAggregations) {
+            return new ArrayList<>(npcAggregations);
+        }
     }
 
     public boolean contains(String npcName) {
-        for (NpcLootAggregate npcAggregate : npcAggregations) {
-            if (npcAggregate.getNpcName().equals(npcName)) {
-                return true;
+        synchronized (npcAggregations) {
+            for (NpcLootAggregate npcAggregate : npcAggregations) {
+                if (npcAggregate.getNpcName().equals(npcName)) {
+                    return true;
+                }
             }
+            return false;
         }
-        return false;
     }
 
     public void removeNpcAggregate(String npcName) {
-        npcAggregations.removeIf(agg -> agg.getNpcName().equals(npcName));
+        synchronized (npcAggregations) {
+            npcAggregations.removeIf(agg -> agg.getNpcName().equals(npcName));
+        }
     }
 
     public boolean matches(String tripName) {
