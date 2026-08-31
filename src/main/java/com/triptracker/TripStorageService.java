@@ -439,8 +439,8 @@ public class TripStorageService {
                 writeExecutor.shutdownNow();
             }
         } catch (InterruptedException e) {
+            log.warn("Interrupted while waiting for persistence executor shutdown");
             writeExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
         }
     }
 
