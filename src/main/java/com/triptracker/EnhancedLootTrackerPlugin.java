@@ -4,6 +4,7 @@ import javax.inject.Inject;
 import javax.swing.*;
 
 import com.google.common.collect.*;
+import com.google.gson.Gson;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
@@ -69,6 +70,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private ChatMessageManager chatMessageManager;
 	@Inject
 	private ConfigManager configManager;
+	@Inject
+	private Gson gson;
 	private static final Pattern PICKPOCKET_REGEX = Pattern.compile("You pick (the )?(?<target>.+)'s? pocket.*");
 	private static final Pattern CLUE_SCROLL_PATTERN = Pattern.compile("You have completed (\\d+) ([a-z]+) Treasure Trails?\\.");
 
@@ -212,7 +215,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 	@Override
 	protected void startUp() throws Exception {
-		storageService = new TripStorageService();
+		storageService = new TripStorageService(gson);
 
 		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
 		panel.setParentPlugin(this);

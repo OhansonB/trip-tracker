@@ -282,7 +282,7 @@ public class TripTest {
         java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir"),
                 "trip-inactivity-test-" + System.currentTimeMillis());
         tempDir.mkdirs();
-        TripStorageService storage = new TripStorageService(tempDir);
+        TripStorageService storage = new TripStorageService(new com.google.gson.Gson(), tempDir);
 
         try {
             // Save an active trip
@@ -328,7 +328,7 @@ public class TripTest {
         java.io.File tempDir = new java.io.File(System.getProperty("java.io.tmpdir"),
                 "trip-paused-inactivity-test-" + System.currentTimeMillis());
         tempDir.mkdirs();
-        TripStorageService storage = new TripStorageService(tempDir);
+        TripStorageService storage = new TripStorageService(new com.google.gson.Gson(), tempDir);
 
         try {
             // Save a paused trip

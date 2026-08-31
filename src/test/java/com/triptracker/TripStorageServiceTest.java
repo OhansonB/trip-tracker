@@ -26,7 +26,7 @@ public class TripStorageServiceTest {
     public void setUp() {
         tempDir = new File(System.getProperty("java.io.tmpdir"), "trip-tracker-test-" + System.currentTimeMillis());
         tempDir.mkdirs();
-        storageService = new TripStorageService(tempDir);
+        storageService = new TripStorageService(new com.google.gson.Gson(), tempDir);
 
         mockPlugin = Mockito.mock(EnhancedLootTrackerPlugin.class);
         when(mockPlugin.getNextTripNumber()).thenReturn(1);

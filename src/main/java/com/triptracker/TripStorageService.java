@@ -53,12 +53,12 @@ public class TripStorageService {
     private final ExecutorService writeExecutor;
     private volatile boolean writesDisabled;
 
-    public TripStorageService() {
-        this(new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME));
+    public TripStorageService(Gson clientGson) {
+        this(clientGson, new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME));
     }
 
-    public TripStorageService(File pluginDir) {
-        this.gson = new GsonBuilder().setPrettyPrinting().create();
+    public TripStorageService(Gson clientGson, File pluginDir) {
+        this.gson = clientGson.newBuilder().setPrettyPrinting().create();
         this.baseDir = pluginDir;
         this.pluginDir = pluginDir;
         this.writeExecutor = Executors.newSingleThreadExecutor(r -> {
