@@ -1108,7 +1108,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 		}
 
-		getItemAggregations(npcName);
+		logItemAggregations(npcName);
 	}
 
 
@@ -1162,7 +1162,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return Math.max(maxId, trips.size()) + 1;
 	}
 
-	public void getItemAggregations(String npcName) {
+	private void logItemAggregations(String npcName) {
 		if (!log.isDebugEnabled()) {
 			return;
 		}
