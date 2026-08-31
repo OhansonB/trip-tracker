@@ -444,7 +444,7 @@ public class TripStorageService {
         }
     }
 
-    // --- File I/O ---
+    // --- File I/O helpers ---
 
     private void writeFile(String fileName, String content) {
         try {
