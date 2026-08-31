@@ -1,137 +1,170 @@
 # Trip Tracker
 
-A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour stats, and trip comparison. Track your drops by grinding session and see exactly what you earned, how fast, and how it compares to previous runs.
+A RuneLite plugin that enhances loot tracking with trip scoping, GP/hour statistics, and trip comparison. Track drops by grinding session to see exactly what was earned, how quickly, and how it compares to previous sessions.
 
-## Features
+## Views
 
-### Three View Modes
+### Panel Controls
 
-- **List View** — Every drop shown individually with NPC name, combat level, items, and GE values
-- **Grouped View** — Loot aggregated by NPC across all kills, sorted by most recent
-- **Trip View** — Scope your loot to named trips for per-session tracking
+The toolbar provides controls for switching between views, filtering by name, and collapsing or expanding all entries.
 
-### Trip Management
+![Panel controls](screenshots/panel-controls.png)
 
-- Create trips to track loot for a specific grinding session
-- Live stats: kills, total GP, GP/hour, and duration (updates in real-time)
-- Pause trips to freeze the timer and stop recording drops without ending the trip
-- Resume paused trips to continue tracking
-- Right-click trips to rename, pause/resume, stop, compare, or delete
-- Click trip headers to collapse/expand
-- Active trips persist across client restarts and logouts
-- Configurable inactivity timeout auto-stops forgotten active trips (default: 3 hours)
-- Paused trips are exempt from inactivity timeout — they survive indefinitely
+1. List view - displays drops grouped by individual kill
+2. Grouped view - displays drops aggregated by NPC name
+3. Trip view - displays trips, with drops grouped by trip and NPC name
+4. Show or hide excluded NPCs and items
+5. Collapse all panels
+6. Expand all panels
+7. Real-time filter by NPC name (in list and grouped views) or trip name (in trip view)
+8. Clear filter
+
+### List View
+
+Each drop is shown individually with the NPC name, combat level, and GE value. Items can be displayed in any view as either sprites or text:
+
+| Sprite view | Text view |
+|---|---|
+| ![Sprite view](screenshots/list-view.png) | ![Text view](screenshots/text-view.png) |
+
+### Grouped View
+
+Loot is aggregated by source across all kills, sorted by most recent. Individual entries can be expanded or collapsed by clicking them, or all entries can be toggled at once using the toolbar controls.
+
+![Grouped view](screenshots/grouped-view.png)
+
+### Trip View
+
+Trips allow loot to be scoped to named sessions. Each trip displays live statistics including kills, total GP, GP/hour, and duration.
+
+![Trip view](screenshots/trip-view.png)
+
+## Trip Management
+
+Trips can be created to track loot for a specific grinding session. All trips persist across client restarts and logouts. A configurable inactivity timeout automatically stops forgotten trips after a set period (default: 3 hours). Paused trips are exempt from this timeout.
+
+| | |
+|---|---|
+| ![Active trip](screenshots/active-trip.png) | ![Paused trip](screenshots/paused-trip.png) |
+
+- **Active trips** display a green indicator and a live-updating timer.
+- **Paused trips** freeze the timer and stop recording drops without ending the trip.
+
+Right-clicking any trip header opens a context menu with management options. Through this menu, trips can be paused, resumed, stopped, compared, deleted, and renamed.
+
+- A trip must be stopped before it can be deleted.
+- A trip must be active before it can be paused.
+- A trip must be paused before it can be resumed.
+- Trips can be renamed, stopped, or compared at any time.
+
+![Context menu](screenshots/context-menu.png)
 
 ### Trip Comparison
 
-- Right-click any trip and select "Compare..." to open the comparison view
-- Select/deselect multiple trips with checkboxes
-- Table shows kills, time, value, GP/hr, and GP/kill side by side
-- Export comparison to CSV or JSON (copied to clipboard)
+Multiple trips can be selected for side-by-side comparison. Results can be exported to CSV, JSON, or a pretty-printed format, all of which are copied to the clipboard.
 
-### Loot Sources Tracked
+![Trip comparison](screenshots/trip-comparison.png)
 
-**NPC & Player Kills**
-- All NPC kills via RuneLite's NpcLootReceived event
-- PvP kills via PlayerLootReceived
+Example export output:
 
-**Pickpocketing**
-- Detects pickpocket loot via inventory diffing
-- Coin pouches shown with estimated GP value per NPC
-- Supports all pickpocketable NPCs
+#### CSV
 
-**Raid & Boss Rewards**
-- Chambers of Xeric (CoX)
-- Theatre of Blood (ToB)
-- Tombs of Amascut (ToA)
-- Barrows chest
-- Fortis Colosseum
-- Lunar Chest (Moons of Peril)
+```
+Trip Name,Kills,Duration (s),Value,GP/hr,GP/kill,Start,End
+Guards 1,4,44,188,15381,47,2026-08-31T14:58:33,2026-08-31T14:59:17
+Guards 2,5,54,328,21866,65,2026-08-31T14:59:26,2026-08-31T15:00:21
+```
 
-**Minigames & Events**
-- Clue Scroll rewards (all tiers: Beginner through Master)
-- Wintertodt supply crates
-- Tempoross reward pool
-- Guardians of the Rift
-- Fishing Trawler
-- Drift Net Fishing
-- Kingdom of Miscellania
+#### JSON
 
-**Skilling & Chests**
-- Herbiboar herb harvests
-- Bird house dismantling
-- Larran's Chest (big and small)
-- Generic treasure chests
-- Farming harvests (herb patches, fruit trees, cactus, allotments, bush patches)
+```
+[
+  {
+    "name": "Guards 1",
+    "kills": 4,
+    "durationSeconds": 44,
+    "value": 188,
+    "gpPerHour": 15381,
+    "gpPerKill": 47,
+    "start": "2026-08-31T14:58:33",
+    "end": "2026-08-31T14:59:17"
+  },
+  {
+    "name": "Guards 2",
+    "kills": 5,
+    "durationSeconds": 54,
+    "value": 328,
+    "gpPerHour": 21866,
+    "gpPerKill": 65,
+    "start": "2026-08-31T14:59:26",
+    "end": "2026-08-31T15:00:21"
+  }
+]
+```
 
-### Persistence
+#### Pretty
 
-- All drops and trips saved to `~/.runelite/trip-tracker/`
-- Asynchronous writes — no gameplay impact
-- Survives client restarts and crashes (saves after every drop)
-- Configurable retention limits (default: 5000 drops, 50 trips)
+```
+Guards 1
+  Kills: 4 | Duration: 44s
+  Value: 188 gp | GP/hr: 15.4k | GP/kill: 47
 
-### Configuration
+Guards 2
+  Kills: 5 | Duration: 54s
+  Value: 328 gp | GP/hr: 21.9k | GP/kill: 65
+```
 
-- **Max drops to keep** (10–10,000) — oldest drops pruned automatically
-- **Max trips to keep** (5–200) — oldest trips pruned automatically
-- **Trip inactivity timeout** (0–14,400 minutes) — auto-stops active trips after this long offline. 0 = stop immediately on logout. Default: 180 minutes (3 hours). Paused trips are exempt.
-- **Show loot in chat** — posts a GP summary to game chat on each drop
-- **Show items as sprites** — toggles between icon grid and text list display
-- **Clear all data** — button in panel footer with confirmation dialog
+## Loot Sources
 
-### UI
+**Combat** - All NPC kills and PvP kills.
 
-- Labeled mode tabs (List, Grouped, Trips)
-- Empty state messages when no data exists
-- Collapsible drop panels and trip panels
-- "Sorted by most recent kill" indicator in grouped view
-- Red "Clear all data" button with confirmation
-- Values shortened for readability (10k, 1.5m, 2.1b)
+**Thieving** - Pickpocket loot detected via inventory diffing. Coin pouches are displayed with an estimated GP value per NPC.
 
-### Keyboard Shortcuts
+**Raids and Bosses** - Chambers of Xeric, Theatre of Blood, Tombs of Amascut, Barrows, Fortis Colosseum, and Lunar Chest.
 
-- **Tab** — Move focus between panels and buttons
-- **Enter / Space** — Toggle collapse on focused trip or loot panel, or activate focused button
-- **Shift+F10** — Open context menu on focused trip header
+**Minigames and Events** - Clue Scrolls (all tiers), Wintertodt, Tempoross, Guardians of the Rift, Fishing Trawler, Drift Net, and Kingdom of Miscellania.
+
+**Skilling** - Herbiboar, bird houses, Larran's Chest, and farming harvests (herbs, fruit trees, cactus, allotments, and bush patches).
+
+## Configuration
+
+| Setting | Description | Default |
+|---|---|---|
+| Max drops | Oldest drops are pruned automatically (10–10,000) | 5,000 |
+| Max trips | Oldest trips are pruned automatically (5–200) | 50 |
+| Trip inactivity timeout | Automatically stops active trips after this duration offline, in minutes. Set to 0 to stop on logout. | 180 |
+| Show loot in chat | Posts a GP summary to game chat for each drop | Off |
+| Show items as sprites | Toggles between an icon grid and a text list | On |
+| Excluded items | Comma-separated list of item names to hide from all views | — |
+| Excluded NPCs | Comma-separated list of NPC names to hide from all views | — |
+
+Items and NPCs can also be excluded by right-clicking them directly in the panel:
+
+| | |
+|---|---|
+| ![Item exclusion](screenshots/item-exclusion.png) | ![NPC exclusion](screenshots/npc-exclusion.png) |
 
 ## Known Limitations
 
-- Items going directly to the **herb sack** or **seed box** (without touching the ground or inventory) may not be tracked. For accurate tracking during trips, consider closing these containers.
-- **Farming herbs**, fishing catches, ore mined, and other skilling outputs beyond farming are not fully tracked — the plugin focuses on loot from combat, thieving, reward sources, and farming harvests.
-- Farming allotment tracking adds +1 to compensate for the first pick that occurs before detection kicks in.
-- Farming harvest detection relies on a debounce timer (~4.2s) after XP stops — if you move away mid-harvest, a partial harvest is recorded.
-- Coin pouch values are **estimates** based on average GP per pickpocket for each NPC.
-- Chest loot tracked via inventory diff may occasionally miss items if other inventory changes happen on the same game tick.
+- Items sent directly to the herb sack or seed box without passing through the inventory may not be tracked.
+- Farming harvest detection relies on a debounce timer (approximately 4.2 seconds) after XP ceases. Moving away mid-harvest results in a partial harvest being recorded. Harvested items that drop onto the floor (such as allotments when inventory is full) will result in partial tracking. Other inventory changes occurring before the debounce timer expires (such as picking up items) may cause additional items to be included.
+- Coin pouch values are estimates based on average GP per pickpocket for each NPC.
+- Chest loot tracked via inventory diff may occasionally miss items if other inventory changes occur on the same game tick.
 
 ## Installation
 
 Search for **Trip Tracker** in the RuneLite Plugin Hub.
 
-## Building
+## Reporting Issues
 
-Requires JDK 11.
+If a bug or feature request is encountered, please [open an issue](https://github.com/OhansonB/trip-tracker/issues).
 
-```
-./gradlew build
-```
+If certain items or loot sources do not behave as expected, please include the following information when submitting an issue:
 
-## Running (development)
+1. **Loot source** - the NPC name, chest name, minigame, or skilling activity involved.
+2. **Expected behaviour** - which items should have been tracked.
+3. **Actual behaviour** - whether nothing was tracked, items were partially tracked, values were incorrect, or the source name was wrong.
+4. **Debug mode output** - whether debug mode was enabled, and if so, the debug chat messages displayed.
+5. **Affected views** - whether the issue appeared in the list, grouped, or trip view, or across all views.
 
-```
-./gradlew run
-```
-
-This launches the full RuneLite client with the plugin loaded.
-
-## Testing
-
-```
-./gradlew test
-```
-
-58 tests covering loot detection, persistence, trip management, and data formatting.
-
-## Feedback
-
-Found a bug or have a feature request? [Open an issue](https://github.com/OhansonB/trip-tracker/issues).
+The most effective way to enable troubleshooting is to reproduce the issue with debug mode enabled and provide a screenshot of the game chat at the relevant moment. Please ensure any sensitive information is redacted before sharing.
