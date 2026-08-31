@@ -69,7 +69,7 @@ public class LootDetectionTest {
         // Set up the debounce executor for processNewDrop
         java.util.concurrent.ScheduledExecutorService debounceExecutor =
                 java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
-        setField(plugin, "debounceExecutor", debounceExecutor);
+        setField(plugin, "executor", debounceExecutor);
     }
 
     // === NPC Kill Tests ===

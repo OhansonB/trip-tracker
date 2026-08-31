@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -191,11 +190,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private TripStorageService storageService;
 	private long currentAccountHash = -1; // Tracks the currently loaded account
 
-	// Debounce persistence: save at most once every 5 seconds
-	private static final long SAVE_DEBOUNCE_MS = 5000;
-	private ScheduledExecutorService debounceExecutor;
-	private ScheduledFuture<?> pendingDropSave;
-	private ScheduledFuture<?> pendingTripSave;
+	// Persistence
+	@Inject
+	private ScheduledExecutorService executor;
 	private final Object saveLock = new Object();
 
 	@Provides
@@ -217,12 +214,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	protected void startUp() throws Exception {
 		storageService = new TripStorageService();
 
-		debounceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-			Thread t = new Thread(r, "trip-tracker-debounce");
-			t.setDaemon(true);
-			return t;
-		});
-
 		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
 		panel.setParentPlugin(this);
 
@@ -236,34 +227,48 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				.build();
 
 		clientToolbar.addNavigation(navButton);
+
+		// If the plugin is started while already logged in (e.g., re-enabled mid-session),
+		// detect the account now since onGameStateChanged(LOGGED_IN) won't re-fire.
+		if (client.getGameState() == GameState.LOGGED_IN) {
+			long accountHash = client.getAccountHash();
+			if (accountHash != -1) {
+				currentAccountHash = accountHash;
+				storageService.switchAccount(accountHash);
+				clearTrackingState();
+				clientThread.invokeLater(() -> loadPersistedData());
+			}
+		}
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
-		// Cancel any pending debounced saves
+		log.debug("shutDown() called. currentAccountHash={}, listViewDropArray.size()={}, trips.size()={}",
+				currentAccountHash, listViewDropArray.size(), trips.size());
+
+		// Cancel any pending farming/bird-nest debounce timers
 		synchronized (saveLock) {
-			if (pendingDropSave != null) {
-				pendingDropSave.cancel(false);
-			}
-			if (pendingTripSave != null) {
-				pendingTripSave.cancel(false);
-			}
 			if (farmingDebounceTimer != null) {
-				farmingDebounceTimer.cancel(false);
+				farmingDebounceTimer.cancel(true);
 			}
 			if (birdNestDebounceTimer != null) {
-				birdNestDebounceTimer.cancel(false);
+				birdNestDebounceTimer.cancel(true);
 			}
 		}
-		debounceExecutor.shutdown();
 
-		// Persist data synchronously before shutdown, then clean up the executor
+		// Drain any in-flight async writes, then prevent new ones.
+		storageService.shutdown();
+
+		// Persist data synchronously as the final authoritative write.
 		if (currentAccountHash != -1) {
+			log.debug("Performing sync save: {} drops, {} trips", listViewDropArray.size(), trips.size());
 			storageService.saveTripsSync(trips);
 			storageService.saveDropsSync(listViewDropArray);
 			storageService.saveLastSessionEpoch(System.currentTimeMillis());
+			log.debug("Sync save completed successfully");
+		} else {
+			log.debug("Skipping sync save: no account loaded");
 		}
-		storageService.shutdown();
 
 		currentAccountHash = -1;
 		clientToolbar.removeNavigation(navButton);
@@ -325,6 +330,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			if (accountHash != -1 && accountHash != currentAccountHash) {
 				// Save current account's data before switching (if we had one loaded)
 				if (currentAccountHash != -1) {
+					storageService.drainPendingWrites();
 					storageService.saveTripsSync(trips);
 					storageService.saveDropsSync(listViewDropArray);
 					storageService.saveLastSessionEpoch(System.currentTimeMillis());
@@ -706,7 +712,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					if (birdNestDebounceTimer != null && !birdNestDebounceTimer.isDone()) {
 						birdNestDebounceTimer.cancel(false);
 					}
-					birdNestDebounceTimer = debounceExecutor.schedule(() -> {
+					birdNestDebounceTimer = executor.schedule(() -> {
 						awaitingBirdNestDiff = false;
 						debugChat("Bird nest debounce expired — no more nests");
 					}, BIRD_NEST_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
@@ -742,7 +748,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 					if (farmingDebounceTimer != null && !farmingDebounceTimer.isDone()) {
 						farmingDebounceTimer.cancel(false);
 					}
-					farmingDebounceTimer = debounceExecutor.schedule(
+					farmingDebounceTimer = executor.schedule(
 							this::completeFarmingHarvest,
 							FARMING_DEBOUNCE_TICKS_MS,
 							TimeUnit.MILLISECONDS
@@ -818,7 +824,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 			lastKnownFarmingLevel = currentLevel;
 
-			farmingDebounceTimer = debounceExecutor.schedule(
+			farmingDebounceTimer = executor.schedule(
 					this::completeFarmingHarvest,
 					debounceMs,
 					TimeUnit.MILLISECONDS
@@ -993,8 +999,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			}
 		}
 
-		// Debounced persistence — save at most once every SAVE_DEBOUNCE_MS
-		scheduleDebouncedSave();
+		// Persist immediately (async via writeExecutor)
+		saveDropsAndTrips();
 	}
 
 	private void updateGroupedViewUI() {
@@ -1135,8 +1141,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		trips.add(new Trip(tripName, this));
 
-		// Persist trip state change (debounced)
-		scheduleDebouncedTripSave();
+		// Persist trip state change
+		saveTrips();
 	}
 
 	public int getNumberOfTrips() {
@@ -1263,11 +1269,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	public void onTripStatusChanged() {
-		scheduleDebouncedTripSave();
+		saveTrips();
 	}
 
 	public void onDropCollapseChanged() {
-		scheduleDebouncedSave();
+		saveDropsAndTrips();
 	}
 
 	public void onGroupedCollapseChanged() {
@@ -1436,51 +1442,27 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	}
 
 	/**
-	 * Schedules a debounced save for both drops and trips.
-	 * If a save is already pending, it is cancelled and rescheduled.
+	 * Saves both drops and trips asynchronously via the storage service's write executor.
 	 */
-	private void scheduleDebouncedSave() {
-		synchronized (saveLock) {
-			if (pendingDropSave != null && !pendingDropSave.isDone()) {
-				pendingDropSave.cancel(false);
-			}
-			if (pendingTripSave != null && !pendingTripSave.isDone()) {
-				pendingTripSave.cancel(false);
-			}
-			pendingDropSave = debounceExecutor.schedule(() -> {
-				List<TrackableItemDrop> dropsCopy;
-				synchronized (listViewDropArray) {
-					dropsCopy = new ArrayList<>(listViewDropArray);
-				}
-				storageService.saveDrops(dropsCopy);
-			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
-
-			pendingTripSave = debounceExecutor.schedule(() -> {
-				List<Trip> tripsCopy;
-				synchronized (trips) {
-					tripsCopy = new ArrayList<>(trips);
-				}
-				storageService.saveTrips(tripsCopy);
-			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+	private void saveDropsAndTrips() {
+		List<TrackableItemDrop> dropsCopy;
+		synchronized (listViewDropArray) {
+			dropsCopy = new ArrayList<>(listViewDropArray);
 		}
+		storageService.saveDrops(dropsCopy);
+
+		saveTrips();
 	}
 
 	/**
-	 * Schedules a debounced save for trips only.
+	 * Saves trips asynchronously via the storage service's write executor.
 	 */
-	private void scheduleDebouncedTripSave() {
-		synchronized (saveLock) {
-			if (pendingTripSave != null && !pendingTripSave.isDone()) {
-				pendingTripSave.cancel(false);
-			}
-			pendingTripSave = debounceExecutor.schedule(() -> {
-				List<Trip> tripsCopy;
-				synchronized (trips) {
-					tripsCopy = new ArrayList<>(trips);
-				}
-				storageService.saveTrips(tripsCopy);
-			}, SAVE_DEBOUNCE_MS, TimeUnit.MILLISECONDS);
+	private void saveTrips() {
+		List<Trip> tripsCopy;
+		synchronized (trips) {
+			tripsCopy = new ArrayList<>(trips);
 		}
+		storageService.saveTrips(tripsCopy);
 	}
 
 	// NPC names used as farming sources (capitalized form of farmingPatchType values)

@@ -59,7 +59,7 @@ public class PluginFixesTest {
 
         java.util.concurrent.ScheduledExecutorService debounceExecutor =
                 java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
-        setField(plugin, "debounceExecutor", debounceExecutor);
+        setField(plugin, "executor", debounceExecutor);
     }
 
     // === Fix #3: numberOfTrips derived from trips.size() ===

@@ -75,7 +75,7 @@ public class FarmingTrackingTest {
         setField(plugin, "config", mockConfig);
         setField(plugin, "storageService", mock(TripStorageService.class));
         setField(plugin, "chatMessageManager", mock(net.runelite.client.chat.ChatMessageManager.class));
-        setField(plugin, "debounceExecutor", debounceExecutor);
+        setField(plugin, "executor", debounceExecutor);
         setField(plugin, "clientThread", mockClientThread);
     }
 

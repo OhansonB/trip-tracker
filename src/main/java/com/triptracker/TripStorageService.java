@@ -51,6 +51,7 @@ public class TripStorageService {
     private final File baseDir; // Root plugin directory (~/.runelite/trip-tracker/)
     private File pluginDir;     // Active data directory (baseDir or baseDir/{accountHash}/)
     private final ExecutorService writeExecutor;
+    private volatile boolean writesDisabled;
 
     public TripStorageService() {
         this(new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME));
@@ -187,6 +188,9 @@ public class TripStorageService {
      * Save trip data to disk asynchronously.
      */
     public void saveTrips(List<Trip> trips) {
+        if (writesDisabled) {
+            return;
+        }
         List<TripRecord> records = new ArrayList<>();
         for (Trip trip : trips) {
             records.add(TripRecord.fromTrip(trip));
@@ -263,6 +267,9 @@ public class TripStorageService {
      * Save the list-view drop history to disk asynchronously.
      */
     public void saveDrops(List<TrackableItemDrop> drops) {
+        if (writesDisabled) {
+            return;
+        }
         List<DropRecord> records = new ArrayList<>();
         for (TrackableItemDrop drop : drops) {
             records.add(DropRecord.fromDrop(drop));
@@ -367,6 +374,9 @@ public class TripStorageService {
      * Save the set of collapsed NPC names (for grouped view) to disk asynchronously.
      */
     public void saveCollapsedNpcs(Set<String> collapsedNpcs) {
+        if (writesDisabled) {
+            return;
+        }
         Set<String> snapshot = new HashSet<>(collapsedNpcs);
         writeExecutor.submit(() -> {
             String json = gson.toJson(snapshot);
@@ -396,9 +406,32 @@ public class TripStorageService {
     // --- Lifecycle ---
 
     /**
+     * Waits for any pending async writes to complete without shutting down the executor.
+     * Call before a sync save to ensure no stale async write overwrites it.
+     */
+    public void drainPendingWrites() {
+        try {
+            // Submit a no-op and wait for it — since the executor is single-threaded,
+            // this guarantees all previously-submitted writes have completed.
+            writeExecutor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Failed to drain pending writes", e);
+        }
+    }
+
+    /**
+     * Immediately shut down the write executor, discarding any pending writes.
+     * Use after a sync save to prevent stale async writes from overwriting it.
+     */
+    public void shutdownNow() {
+        writeExecutor.shutdownNow();
+    }
+
+    /**
      * Shutdown the write executor, waiting for pending writes to complete.
      */
     public void shutdown() {
+        writesDisabled = true;
         writeExecutor.shutdown();
         try {
             if (!writeExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
