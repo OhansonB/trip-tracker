@@ -12,7 +12,7 @@ public class TrackableItemDrop {
     private final int npcCombatLevel;
     private long totalDropGeValue;
     private long totalDropHaValue;
-    private boolean collapsed;
+    private volatile boolean collapsed;
 
     TrackableItemDrop(String npcName, int npcCombatLevel) {
         this.npcName = npcName;
