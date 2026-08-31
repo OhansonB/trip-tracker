@@ -179,6 +179,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private String lastPickpocketTarget;
 	private Multiset<Integer> referenceInventorySnapshot;
 	private Multiset<Integer> previousReferenceInventorySnapshot;
+	@Inject
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
 	private final List<TrackableItemDrop> listViewDropArray = Collections.synchronizedList(new ArrayList<>());
@@ -213,9 +214,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	@Override
 	protected void startUp() throws Exception {
 		storageService = new TripStorageService();
-
-		panel = injector.getInstance(EnhancedLootTrackerPanel.class);
-		panel.setParentPlugin(this);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/panel_icon.png");
 

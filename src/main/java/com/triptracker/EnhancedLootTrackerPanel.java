@@ -6,6 +6,7 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.SwingUtil;
 
+import javax.inject.Inject;
 import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
@@ -23,7 +24,7 @@ import java.util.Set;
 public class EnhancedLootTrackerPanel extends PluginPanel {
     private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
 
-    private EnhancedLootTrackerPlugin parentPlugin;
+    private final EnhancedLootTrackerPlugin parentPlugin;
     private JPanel lootBoxPanel;
     private JPanel layoutPanel;
     private final int DEFAULT_TRACKING_MODE = 0;
@@ -81,7 +82,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private JTextField tripFilterField;
     private boolean showHidden = false;
 
-    EnhancedLootTrackerPanel() {
+    @Inject
+    EnhancedLootTrackerPanel(EnhancedLootTrackerPlugin parentPlugin) {
+        this.parentPlugin = parentPlugin;
         setBorder(new EmptyBorder(6, 6, 6, 6));
         setBackground(ColorScheme.DARK_GRAY_COLOR);
         setLayout(new BorderLayout());
@@ -735,10 +738,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
                 parentPlugin.onTripStatusChanged();
                 break;
         }
-    }
-
-    public void setParentPlugin(EnhancedLootTrackerPlugin parentPlugin) {
-        this.parentPlugin = parentPlugin;
     }
 
     public void setCollapsedNpcs(Set<String> collapsedNpcs) {
