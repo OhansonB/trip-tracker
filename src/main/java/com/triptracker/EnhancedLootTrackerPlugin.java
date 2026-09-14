@@ -8,6 +8,7 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
@@ -122,6 +123,13 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	// Varbit ID for Chambers of Xeric raid state (1 = inside raid)
 	private static final int IN_RAID_VARBIT = 5432;
 
+	// PvP / Emir's Arena state varbits. The arena loads a preset combat kit into the
+	// inventory (supply box) AND fires a spurious Farming StatChanged on the same tick,
+	// plus sets stats to 99 (a farming "level-up"), which together mis-arm the farming
+	// harvest detector and record the kit as a "Farming Patch" drop (bug #23).
+	// The harvest arms during STAGING (before PVP_AREA_CLIENT flips), so we must cover
+	// the staging phase as well as the battle phase — hence the union of these vars.
+
 	// Region IDs for location-specific loot
 	private static final int WINTERTODT_REGION = 6461;
 	private static final int TEMPOROSS_REGION = 12588;
@@ -143,6 +151,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private int lastInventoryChangeTick = -1; // game tick of most recent ItemContainerChanged
 	private int lastFarmingXpTick = -1; // game tick of most recent Farming XP event
 	private int lastKnownFarmingLevel = -1; // track farming level to detect level-ups mid-harvest
+	private int lastKnownFarmingXp = -1; // track farming total XP to reject spurious StatChanged events (no increase)
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -533,7 +542,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Farming harvest detection
 		final Matcher farmingMatcher = FARMING_HARVEST_PATTERN.matcher(message);
-		if (farmingMatcher.matches() && !farmingHarvestInProgress && !isInsideChambers()) {
+		if (farmingMatcher.matches() && !farmingHarvestInProgress && !isInsideChambers() && !isInsidePvpArena()) {
 			String patchType = farmingMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -543,7 +552,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 
 		// Cactus patch picking — uses a different message than standard harvesting
-		if (message.equals(CACTUS_PICK_MESSAGE) && !farmingHarvestInProgress) {
+		if (message.equals(CACTUS_PICK_MESSAGE) && !farmingHarvestInProgress && !isInsidePvpArena()) {
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
 			farmingPatchType = "cactus patch";
@@ -553,7 +562,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Fruit tree / bush picking — "You pick a coconut.", "You pick a banana.", etc.
 		final Matcher pickMatcher = FARMING_PICK_PATTERN.matcher(message);
-		if (pickMatcher.matches() && !farmingHarvestInProgress) {
+		if (pickMatcher.matches() && !farmingHarvestInProgress && !isInsidePvpArena()) {
 			String pickedItem = pickMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -739,7 +748,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			// Check if farming XP fired on this same tick but before this inventory change
 			// (flowers: StatChanged fires before ItemContainerChanged)
 			int currentTick = client.getTickCount();
-			if (!farmingHarvestInProgress && lastFarmingXpTick == currentTick && previousReferenceInventorySnapshot != null) {
+			if (!farmingHarvestInProgress && lastFarmingXpTick == currentTick && previousReferenceInventorySnapshot != null
+					&& !isInsidePvpArena()) {
 				farmingHarvestInProgress = true;
 				farmingPatchType = "farming patch";
 				farmingStartedFromXp = true;
@@ -772,6 +782,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return client.getVarbitValue(IN_RAID_VARBIT) == 1;
 	}
 
+	/**
+	 * Returns true if the player is currently in the PvP / Emir's Arena flow — either the
+	 * staging area (choosing loadout / supply box) or the battle area. Covers both phases
+	 * because the farming detector mis-arms during staging, before PVP_AREA_CLIENT flips.
+	 * See bug #23.
+	 */
+	private boolean isInsidePvpArena() {
+		return client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1
+				|| client.getVarbitValue(VarbitID.PVPA_STAGINGAREA_TIMEREMAINING) > 0
+				|| client.getVarbitValue(VarbitID.PVPA_BATTLEAREA_TIMEREMAINING) > 0;
+	}
+
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
 		if (event.getSkill() != Skill.FARMING) {
@@ -783,7 +805,26 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			return;
 		}
 
-		debugChat("Farming XP event: total=" + event.getXp() + ", harvestInProgress=" + farmingHarvestInProgress);
+		// Skip farming tracking entirely in the PvP / Emir's Arena (bug #23). The arena
+		// loads a combat kit and fires a spurious Farming StatChanged on the same tick,
+		// which would otherwise arm a bogus "Farming Patch" harvest.
+		if (isInsidePvpArena()) {
+			return;
+		}
+
+		// Heuristic hardening: a genuine farming harvest always *increases* total XP.
+		// The arena's StatChanged reports the unchanged existing total, so ignore any
+		// Farming StatChanged whose total did not actually go up. This also guards
+		// against other phantom-XP sources we haven't mapped.
+		final int newFarmingXp = event.getXp();
+		if (lastKnownFarmingXp >= 0 && newFarmingXp <= lastKnownFarmingXp) {
+			debugChat("Farming XP event ignored (total did not increase: " + lastKnownFarmingXp + " -> " + newFarmingXp + ")");
+			lastKnownFarmingXp = newFarmingXp;
+			return;
+		}
+		lastKnownFarmingXp = newFarmingXp;
+
+		debugChat("Farming XP event: total=" + newFarmingXp + ", harvestInProgress=" + farmingHarvestInProgress);
 
 		if (!farmingHarvestInProgress) {
 			// No chat trigger fired (e.g., allotments, flowers have no harvest message).
