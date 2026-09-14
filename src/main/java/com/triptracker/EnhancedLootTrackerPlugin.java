@@ -1450,13 +1450,32 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	/**
 	 * Sends a debug message to game chat when debug mode is enabled.
 	 */
+	// Developer-only console mirroring of debug output. Enabled via the JVM system
+	// property -Dtriptracker.consoleDebug=true, which the Gradle `run` task sets for
+	// from-source development. It is NOT wired to the plugin's Debug-mode config and is
+	// never set by the published client, so end users are unaffected regardless of their
+	// settings.
+	private static final boolean CONSOLE_DEBUG =
+			Boolean.getBoolean("triptracker.consoleDebug");
+
 	private void debugChat(String message) {
-		if (config.debugMode()) {
+		if (config.debugMode() || CONSOLE_DEBUG) {
 			String timestamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
-			chatMessageManager.queue(QueuedMessage.builder()
-					.type(ChatMessageType.GAMEMESSAGE)
-					.runeLiteFormattedMessage("[Trip Tracker " + timestamp + "] " + message)
-					.build());
+			String formatted = "[Trip Tracker " + timestamp + "] " + message;
+
+			// In-game chat output — driven solely by the shipped Debug-mode config.
+			if (config.debugMode()) {
+				chatMessageManager.queue(QueuedMessage.builder()
+						.type(ChatMessageType.GAMEMESSAGE)
+						.runeLiteFormattedMessage(formatted)
+						.build());
+			}
+
+			// Console/terminal output — dev-only, gated on the system property so it
+			// never touches an end user's log file.
+			if (CONSOLE_DEBUG) {
+				log.info(formatted);
+			}
 		}
 	}
 
