@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ master, 'release/**' ]
+  push:
+    branches: [ master ]   # sanity-check master after each release/hotfix merge
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '11'      # matches sourceCompatibility in build.gradle
+          distribution: 'temurin'
+          cache: 'gradle'         # caches ~/.gradle across runs (RuneLite deps are the slow part)
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
