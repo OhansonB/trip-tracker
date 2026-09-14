@@ -587,6 +587,13 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, int tripId) {
         String npcName = npcLootAggregate.getNpcName();
+
+        // Apply NPC exclusion filter (unless showing hidden). Without this guard, an
+        // incremental kill on an excluded NPC during an active trip re-adds and
+        // re-renders its box (bug #22). Mirrors the list- and grouped-view overloads.
+        if (!showHidden && parentPlugin.isNpcExcluded(npcName)) {
+            return;
+        }
         int numberOfKills = npcLootAggregate.getNumberOfKills();
         String lastKillTime = npcLootAggregate.getLastKillTime();
 
