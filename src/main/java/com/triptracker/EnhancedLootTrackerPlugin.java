@@ -19,8 +19,9 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.events.PlayerLootReceived;
+import net.runelite.client.events.ServerNpcLoot;
+import net.runelite.client.util.Text;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -388,20 +389,25 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		farmingHarvestInProgress = false;
 	}
 
+	/**
+	 * Handles NPC loot via {@link ServerNpcLoot}, which fires once per kill regardless of
+	 * tile stacking. {@code NpcLootReceived} merges same-tile/same-tick kills into one event,
+	 * undercounting kills for stacked deaths (e.g. barraging).
+	 */
 	@Subscribe
-	public void onNpcLootReceived(final NpcLootReceived npcLootReceived) {
-		final NPC npc = npcLootReceived.getNpc();
-		final Collection<ItemStack> items = npcLootReceived.getItems();
+	public void onServerNpcLoot(final ServerNpcLoot serverNpcLoot) {
+		final NPCComposition composition = serverNpcLoot.getComposition();
+		final Collection<ItemStack> items = serverNpcLoot.getItems();
 
-		final String npcName = npc.getName();
+		final String npcName = Text.removeTags(composition.getName());
 		lastNpcKilled = npcName;
-		final int combat = npc.getCombatLevel();
+		final int combat = composition.getCombatLevel();
 
 		debugChat("NPC kill: " + npcName + " (lvl " + combat + ") - " + items.size() + " items");
 
 		TrackableItemDrop newItemDrop = new TrackableItemDrop(npcName, combat);
 
-		for (final ItemStack item: items) {
+		for (final ItemStack item : items) {
 			TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
 			newItemDrop.addLootToDrop(droppedItem);
 		}

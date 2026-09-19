@@ -2,8 +2,8 @@ package com.triptracker;
 
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.NPC;
-import net.runelite.client.events.NpcLootReceived;
+import net.runelite.api.NPCComposition;
+import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.ui.ClientToolbar;
@@ -187,11 +187,11 @@ public class DebounceSaveShutdownTest {
     // === Helper methods ===
 
     private void fireNpcDrop(String npcName, int combatLevel, int itemId, int quantity) {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn(npcName);
         when(mockNpc.getCombatLevel()).thenReturn(combatLevel);
 
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc,
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc,
                 Arrays.asList(new ItemStack(itemId, quantity))));
     }
 
