@@ -205,12 +205,26 @@ public class TripStorageService {
     }
 
     /**
-     * Save trip data to disk synchronously (for use during shutdown).
+     * Save trip data synchronously (shutdown / account switch). Won't overwrite a non-empty
+     * file with an empty list; for an intentional clear use {@link #saveTripsSync(List, boolean)}.
      */
     public void saveTripsSync(List<Trip> trips) {
+        saveTripsSync(trips, false);
+    }
+
+    /**
+     * @param allowEmpty false refuses to overwrite a non-empty trips file with an empty list
+     *                   (see #26); pass true only when the empty result is intentional (deletion).
+     */
+    public void saveTripsSync(List<Trip> trips, boolean allowEmpty) {
         List<TripRecord> records = new ArrayList<>();
         for (Trip trip : trips) {
             records.add(TripRecord.fromTrip(trip));
+        }
+
+        if (!allowEmpty && records.isEmpty() && !loadTrips().isEmpty()) {
+            log.warn("Refusing to overwrite non-empty trips file with empty data (see #26)");
+            return;
         }
 
         JsonObject envelope = new JsonObject();
@@ -284,12 +298,26 @@ public class TripStorageService {
     }
 
     /**
-     * Save the list-view drop history to disk synchronously (for use during shutdown).
+     * Save the list-view drop history synchronously (shutdown / account switch). Won't overwrite
+     * a non-empty file with an empty list; for an intentional clear use the two-arg overload.
      */
     public void saveDropsSync(List<TrackableItemDrop> drops) {
+        saveDropsSync(drops, false);
+    }
+
+    /**
+     * @param allowEmpty false refuses to overwrite a non-empty drops file with an empty list
+     *                   (see #26); pass true only when the empty result is intentional.
+     */
+    public void saveDropsSync(List<TrackableItemDrop> drops, boolean allowEmpty) {
         List<DropRecord> records = new ArrayList<>();
         for (TrackableItemDrop drop : drops) {
             records.add(DropRecord.fromDrop(drop));
+        }
+
+        if (!allowEmpty && records.isEmpty() && !loadDrops().isEmpty()) {
+            log.warn("Refusing to overwrite non-empty drops file with empty data (see #26)");
+            return;
         }
 
         JsonObject envelope = new JsonObject();

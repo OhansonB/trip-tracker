@@ -202,6 +202,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private boolean chestLooted;
 	private TripStorageService storageService;
 	private long currentAccountHash = -1; // Tracks the currently loaded account
+	// True once loadPersistedData() has actually populated in-memory state from disk for the
+	// current account. Guards against the startup race where startUp() sets currentAccountHash
+	// and clears in-memory state, but shutDown() runs (plugin disable/reload/startup crash)
+	// before the deferred loadPersistedData() executes — which would otherwise persist empty
+	// lists over the real data files. See backlog #26.
+	private volatile boolean dataLoaded;
 
 	// Persistence
 	@Inject
@@ -273,12 +279,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		storageService.shutdown();
 
 		// Persist data synchronously as the final authoritative write.
-		if (currentAccountHash != -1) {
+		// Only write when data was actually loaded this session: if shutDown() runs after the
+		// startup clear but before the deferred loadPersistedData() (plugin disable/reload or a
+		// startup crash), the in-memory lists are empty and writing them would clobber the real
+		// data files. The dataLoaded guard closes that race. See #26.
+		if (currentAccountHash != -1 && dataLoaded) {
 			log.debug("Performing sync save: {} drops, {} trips", listViewDropArray.size(), trips.size());
 			storageService.saveTripsSync(trips);
 			storageService.saveDropsSync(listViewDropArray);
 			storageService.saveLastSessionEpoch(System.currentTimeMillis());
 			log.debug("Sync save completed successfully");
+		} else if (currentAccountHash != -1) {
+			log.debug("Skipping sync save: data not yet loaded this session (avoiding empty-state overwrite)");
 		} else {
 			log.debug("Skipping sync save: no account loaded");
 		}
@@ -323,6 +335,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		log.debug("Loaded {} drops and {} trips from disk", dropRecords.size(), tripRecords.size());
 
+		// In-memory state now reflects disk — safe for shutDown() to persist it authoritatively.
+		dataLoaded = true;
+
 		// Load collapsed NPC names for the grouped view
 		Set<String> collapsedNpcs = storageService.loadCollapsedNpcs();
 
@@ -341,8 +356,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (event.getGameState() == GameState.LOGGED_IN) {
 			long accountHash = client.getAccountHash();
 			if (accountHash != -1 && accountHash != currentAccountHash) {
-				// Save current account's data before switching (if we had one loaded)
-				if (currentAccountHash != -1) {
+				// Save current account's data before switching (only if it was actually loaded;
+				// never write empty in-memory state over a good file — see #26).
+				if (currentAccountHash != -1 && dataLoaded) {
 					storageService.drainPendingWrites();
 					storageService.saveTripsSync(trips);
 					storageService.saveDropsSync(listViewDropArray);
@@ -387,6 +403,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		awaitingLootDiff = false;
 		awaitingBirdNestDiff = false;
 		farmingHarvestInProgress = false;
+		// In-memory state no longer reflects disk until the (possibly deferred) load runs.
+		// Prevents shutDown() from writing this empty state over good data files. See #26.
+		dataLoaded = false;
 	}
 
 	/**
@@ -1310,12 +1329,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			}
 		}
-		// Save immediately — trip deletion is destructive and must not be lost
+		// Save immediately — trip deletion is destructive and must not be lost.
+		// allowEmpty=true: deleting the last trip legitimately produces an empty list, which
+		// must be persisted (the empty-overwrite guard would otherwise refuse it). See #26.
 		List<Trip> tripsCopy;
 		synchronized (trips) {
 			tripsCopy = new ArrayList<>(trips);
 		}
-		storageService.saveTripsSync(tripsCopy);
+		storageService.saveTripsSync(tripsCopy, true);
 	}
 
 	public void onTripStatusChanged() {
