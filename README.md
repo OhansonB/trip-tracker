@@ -150,7 +150,6 @@ Items and NPCs can also be excluded by right-clicking them directly in the panel
 - Farming harvest detection relies on a debounce timer (approximately 4.2 seconds) after XP ceases. Moving away mid-harvest results in a partial harvest being recorded. Harvested items that drop onto the floor (such as allotments when inventory is full) will result in partial tracking. Other inventory changes occurring before the debounce timer expires (such as picking up items) may cause additional items to be included.
 - Coin pouch values are estimates based on average GP per pickpocket for each NPC.
 - Chest loot tracked via inventory diff may occasionally miss items if other inventory changes occur on the same game tick.
-- When multiple NPCs die on the same tile on the same game tick (for example, when barraging a stack of monsters), only one kill is counted. This is a constraint of RuneLite's loot detection, which reads drops from the death tile and processes only the first same-tile, same-tick death; the built-in Loot Tracker under-counts these kills in the same way. The loot that is delivered is still recorded, but the kill count (and therefore GP/kill) may be lower than the true number of kills.
 
 ## Installation
 
