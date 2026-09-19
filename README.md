@@ -151,6 +151,15 @@ Items and NPCs can also be excluded by right-clicking them directly in the panel
 - Coin pouch values are estimates based on average GP per pickpocket for each NPC.
 - Chest loot tracked via inventory diff may occasionally miss items if other inventory changes occur on the same game tick.
 
+## Release Notes
+
+### v1.0.1
+
+- Fix a startup/shutdown race where disabling, reloading, or crashing the plugin before its saved data finished loading could overwrite the stored trips and drops with empty data.
+- Fix same-tick multi-kills (such as barraging a stack of NPCs) where several kills were counted as one, undercounting kills and merging their loot. Kills are now recorded per server-side drop, so the count and loot are accurate.
+- Fix loot received in the PvP/Emir's Arena where the arena's supply kit was recorded as a "Farming Patch" drop. Farming tracking is now disabled inside the arena.
+- Fix hidden NPCs where they reappeared in an active trip after a new kill, even though the trip's stats already excluded them. The trip view now honours the exclusion filter on every update.
+
 ## Installation
 
 Search for **Trip Tracker** in the RuneLite Plugin Hub.
