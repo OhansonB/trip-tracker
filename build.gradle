@@ -25,7 +25,7 @@ dependencies {
 }
 
 group = 'com.triptracker'
-version = '1.0.1-SNAPSHOT'
+version = '1.0.1'
 sourceCompatibility = '11'
 targetCompatibility = '11'
 
