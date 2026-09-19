@@ -37,5 +37,8 @@ tasks.withType(JavaCompile) {
 task run(type: JavaExec) {
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = 'com.triptracker.EnhancedLootTrackerTest'
-	jvmArgs = ['-ea', '-Xmx1g', '-Xss2m']
+	// -Dtriptracker.consoleDebug=true mirrors the plugin's debug output to the terminal
+	// for from-source development. This flag is dev-only and is never set by the
+	// published client, so end users are unaffected.
+	jvmArgs = ['-ea', '-Xmx1g', '-Xss2m', '-Dtriptracker.consoleDebug=true']
 }
