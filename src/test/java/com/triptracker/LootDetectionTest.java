@@ -3,9 +3,10 @@ package com.triptracker;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import net.runelite.api.*;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import org.junit.Before;
@@ -76,7 +77,7 @@ public class LootDetectionTest {
 
     @Test
     public void testNpcKillCreatesDropWithCorrectNpcName() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Guard");
         when(mockNpc.getCombatLevel()).thenReturn(21);
 
@@ -85,8 +86,8 @@ public class LootDetectionTest {
                 new ItemStack(995, 30)  // Coins
         );
 
-        NpcLootReceived event = new NpcLootReceived(mockNpc, items);
-        plugin.onNpcLootReceived(event);
+        ServerNpcLoot event = new ServerNpcLoot(mockNpc, items);
+        plugin.onServerNpcLoot(event);
 
         List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         assertEquals(1, drops.size());
@@ -96,7 +97,7 @@ public class LootDetectionTest {
 
     @Test
     public void testNpcKillCreatesDropWithCorrectItems() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Man");
         when(mockNpc.getCombatLevel()).thenReturn(2);
 
@@ -105,7 +106,7 @@ public class LootDetectionTest {
                 new ItemStack(995, 3)
         );
 
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, items));
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, items));
 
         List<TrackableItemDrop> drops = plugin.getListViewDropArray();
         TrackableItemDrop drop = drops.get(0);
@@ -114,11 +115,11 @@ public class LootDetectionTest {
 
     @Test
     public void testNpcKillUpdatesLastNpcKilled() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Goblin");
         when(mockNpc.getCombatLevel()).thenReturn(5);
 
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(526, 1))));
 
         String lastNpcKilled = (String) getField(plugin, "lastNpcKilled");
         assertEquals("Goblin", lastNpcKilled);
@@ -217,10 +218,10 @@ public class LootDetectionTest {
     @Test
     public void testPickpocketAttributesToCorrectNpcNotLastKilled() throws Exception {
         // First, kill a Goblin (sets lastNpcKilled to "Goblin")
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Goblin");
         when(mockNpc.getCombatLevel()).thenReturn(5);
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(526, 1))));
 
         String lastKilled = (String) getField(plugin, "lastNpcKilled");
         assertEquals("Goblin", lastKilled);
@@ -424,13 +425,13 @@ public class LootDetectionTest {
         EnhancedLootTrackerConfig mockConfig = (EnhancedLootTrackerConfig) getField(plugin, "config");
         when(mockConfig.maxDrops()).thenReturn(3);
 
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Man");
         when(mockNpc.getCombatLevel()).thenReturn(2);
 
         // Add 5 drops
         for (int i = 0; i < 5; i++) {
-            plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+            plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(526, 1))));
         }
 
         // Only 3 should remain
@@ -444,13 +445,13 @@ public class LootDetectionTest {
         EnhancedLootTrackerConfig mockConfig = (EnhancedLootTrackerConfig) getField(plugin, "config");
         when(mockConfig.maxDrops()).thenReturn(2);
 
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Guard");
         when(mockNpc.getCombatLevel()).thenReturn(21);
 
         // Add 4 drops (will trim to 2)
         for (int i = 0; i < 4; i++) {
-            plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+            plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(526, 1))));
         }
 
         // Aggregate should reflect only 2 kills (the retained ones)
@@ -461,13 +462,13 @@ public class LootDetectionTest {
 
     @Test
     public void testClearAllDataEmptiesEverything() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Goblin");
         when(mockNpc.getCombatLevel()).thenReturn(5);
 
         // Add some drops
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(526, 1))));
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc, Arrays.asList(new ItemStack(995, 10))));
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(526, 1))));
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc, Arrays.asList(new ItemStack(995, 10))));
 
         assertEquals(2, plugin.getListViewDropArray().size());
         assertNotNull(plugin.getNpcAggregate("Goblin"));

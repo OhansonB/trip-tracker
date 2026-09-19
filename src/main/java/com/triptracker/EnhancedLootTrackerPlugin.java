@@ -8,6 +8,7 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
@@ -18,8 +19,9 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.NpcLootReceived;
 import net.runelite.client.events.PlayerLootReceived;
+import net.runelite.client.events.ServerNpcLoot;
+import net.runelite.client.util.Text;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -122,6 +124,13 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	// Varbit ID for Chambers of Xeric raid state (1 = inside raid)
 	private static final int IN_RAID_VARBIT = 5432;
 
+	// PvP / Emir's Arena state varbits. The arena loads a preset combat kit into the
+	// inventory (supply box) AND fires a spurious Farming StatChanged on the same tick,
+	// plus sets stats to 99 (a farming "level-up"), which together mis-arm the farming
+	// harvest detector and record the kit as a "Farming Patch" drop (bug #23).
+	// The harvest arms during STAGING (before PVP_AREA_CLIENT flips), so we must cover
+	// the staging phase as well as the battle phase — hence the union of these vars.
+
 	// Region IDs for location-specific loot
 	private static final int WINTERTODT_REGION = 6461;
 	private static final int TEMPOROSS_REGION = 12588;
@@ -143,6 +152,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private int lastInventoryChangeTick = -1; // game tick of most recent ItemContainerChanged
 	private int lastFarmingXpTick = -1; // game tick of most recent Farming XP event
 	private int lastKnownFarmingLevel = -1; // track farming level to detect level-ups mid-harvest
+	private int lastKnownFarmingXp = -1; // track farming total XP to reject spurious StatChanged events (no increase)
 
 	// All known coin pouch item IDs in OSRS (different NPCs give different pouch IDs)
 	private static final Set<Integer> COIN_POUCH_IDS = new HashSet<>(Arrays.asList(
@@ -192,6 +202,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private boolean chestLooted;
 	private TripStorageService storageService;
 	private long currentAccountHash = -1; // Tracks the currently loaded account
+	// True once loadPersistedData() has actually populated in-memory state from disk for the
+	// current account. Guards against the startup race where startUp() sets currentAccountHash
+	// and clears in-memory state, but shutDown() runs (plugin disable/reload/startup crash)
+	// before the deferred loadPersistedData() executes — which would otherwise persist empty
+	// lists over the real data files. See backlog #26.
+	private volatile boolean dataLoaded;
 
 	// Persistence
 	@Inject
@@ -263,12 +279,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		storageService.shutdown();
 
 		// Persist data synchronously as the final authoritative write.
-		if (currentAccountHash != -1) {
+		// Only write when data was actually loaded this session: if shutDown() runs after the
+		// startup clear but before the deferred loadPersistedData() (plugin disable/reload or a
+		// startup crash), the in-memory lists are empty and writing them would clobber the real
+		// data files. The dataLoaded guard closes that race. See #26.
+		if (currentAccountHash != -1 && dataLoaded) {
 			log.debug("Performing sync save: {} drops, {} trips", listViewDropArray.size(), trips.size());
 			storageService.saveTripsSync(trips);
 			storageService.saveDropsSync(listViewDropArray);
 			storageService.saveLastSessionEpoch(System.currentTimeMillis());
 			log.debug("Sync save completed successfully");
+		} else if (currentAccountHash != -1) {
+			log.debug("Skipping sync save: data not yet loaded this session (avoiding empty-state overwrite)");
 		} else {
 			log.debug("Skipping sync save: no account loaded");
 		}
@@ -313,6 +335,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		log.debug("Loaded {} drops and {} trips from disk", dropRecords.size(), tripRecords.size());
 
+		// In-memory state now reflects disk — safe for shutDown() to persist it authoritatively.
+		dataLoaded = true;
+
 		// Load collapsed NPC names for the grouped view
 		Set<String> collapsedNpcs = storageService.loadCollapsedNpcs();
 
@@ -331,8 +356,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		if (event.getGameState() == GameState.LOGGED_IN) {
 			long accountHash = client.getAccountHash();
 			if (accountHash != -1 && accountHash != currentAccountHash) {
-				// Save current account's data before switching (if we had one loaded)
-				if (currentAccountHash != -1) {
+				// Save current account's data before switching (only if it was actually loaded;
+				// never write empty in-memory state over a good file — see #26).
+				if (currentAccountHash != -1 && dataLoaded) {
 					storageService.drainPendingWrites();
 					storageService.saveTripsSync(trips);
 					storageService.saveDropsSync(listViewDropArray);
@@ -377,22 +403,30 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		awaitingLootDiff = false;
 		awaitingBirdNestDiff = false;
 		farmingHarvestInProgress = false;
+		// In-memory state no longer reflects disk until the (possibly deferred) load runs.
+		// Prevents shutDown() from writing this empty state over good data files. See #26.
+		dataLoaded = false;
 	}
 
+	/**
+	 * Handles NPC loot via {@link ServerNpcLoot}, which fires once per kill regardless of
+	 * tile stacking. {@code NpcLootReceived} merges same-tile/same-tick kills into one event,
+	 * undercounting kills for stacked deaths (e.g. barraging).
+	 */
 	@Subscribe
-	public void onNpcLootReceived(final NpcLootReceived npcLootReceived) {
-		final NPC npc = npcLootReceived.getNpc();
-		final Collection<ItemStack> items = npcLootReceived.getItems();
+	public void onServerNpcLoot(final ServerNpcLoot serverNpcLoot) {
+		final NPCComposition composition = serverNpcLoot.getComposition();
+		final Collection<ItemStack> items = serverNpcLoot.getItems();
 
-		final String npcName = npc.getName();
+		final String npcName = Text.removeTags(composition.getName());
 		lastNpcKilled = npcName;
-		final int combat = npc.getCombatLevel();
+		final int combat = composition.getCombatLevel();
 
 		debugChat("NPC kill: " + npcName + " (lvl " + combat + ") - " + items.size() + " items");
 
 		TrackableItemDrop newItemDrop = new TrackableItemDrop(npcName, combat);
 
-		for (final ItemStack item: items) {
+		for (final ItemStack item : items) {
 			TrackableDroppedItem droppedItem = buildTrackableItem(item.getId(), item.getQuantity());
 			newItemDrop.addLootToDrop(droppedItem);
 		}
@@ -533,7 +567,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Farming harvest detection
 		final Matcher farmingMatcher = FARMING_HARVEST_PATTERN.matcher(message);
-		if (farmingMatcher.matches() && !farmingHarvestInProgress && !isInsideChambers()) {
+		if (farmingMatcher.matches() && !farmingHarvestInProgress && !isInsideChambers() && !isInsidePvpArena()) {
 			String patchType = farmingMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -543,7 +577,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 
 		// Cactus patch picking — uses a different message than standard harvesting
-		if (message.equals(CACTUS_PICK_MESSAGE) && !farmingHarvestInProgress) {
+		if (message.equals(CACTUS_PICK_MESSAGE) && !farmingHarvestInProgress && !isInsidePvpArena()) {
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
 			farmingPatchType = "cactus patch";
@@ -553,7 +587,7 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 		// Fruit tree / bush picking — "You pick a coconut.", "You pick a banana.", etc.
 		final Matcher pickMatcher = FARMING_PICK_PATTERN.matcher(message);
-		if (pickMatcher.matches() && !farmingHarvestInProgress) {
+		if (pickMatcher.matches() && !farmingHarvestInProgress && !isInsidePvpArena()) {
 			String pickedItem = pickMatcher.group(1);
 			farmingHarvestInProgress = true;
 			farmingStartedFromXp = false;
@@ -739,7 +773,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			// Check if farming XP fired on this same tick but before this inventory change
 			// (flowers: StatChanged fires before ItemContainerChanged)
 			int currentTick = client.getTickCount();
-			if (!farmingHarvestInProgress && lastFarmingXpTick == currentTick && previousReferenceInventorySnapshot != null) {
+			if (!farmingHarvestInProgress && lastFarmingXpTick == currentTick && previousReferenceInventorySnapshot != null
+					&& !isInsidePvpArena()) {
 				farmingHarvestInProgress = true;
 				farmingPatchType = "farming patch";
 				farmingStartedFromXp = true;
@@ -772,6 +807,18 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		return client.getVarbitValue(IN_RAID_VARBIT) == 1;
 	}
 
+	/**
+	 * Returns true if the player is currently in the PvP / Emir's Arena flow — either the
+	 * staging area (choosing loadout / supply box) or the battle area. Covers both phases
+	 * because the farming detector mis-arms during staging, before PVP_AREA_CLIENT flips.
+	 * See bug #23.
+	 */
+	private boolean isInsidePvpArena() {
+		return client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1
+				|| client.getVarbitValue(VarbitID.PVPA_STAGINGAREA_TIMEREMAINING) > 0
+				|| client.getVarbitValue(VarbitID.PVPA_BATTLEAREA_TIMEREMAINING) > 0;
+	}
+
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
 		if (event.getSkill() != Skill.FARMING) {
@@ -783,7 +830,26 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			return;
 		}
 
-		debugChat("Farming XP event: total=" + event.getXp() + ", harvestInProgress=" + farmingHarvestInProgress);
+		// Skip farming tracking entirely in the PvP / Emir's Arena (bug #23). The arena
+		// loads a combat kit and fires a spurious Farming StatChanged on the same tick,
+		// which would otherwise arm a bogus "Farming Patch" harvest.
+		if (isInsidePvpArena()) {
+			return;
+		}
+
+		// Heuristic hardening: a genuine farming harvest always *increases* total XP.
+		// The arena's StatChanged reports the unchanged existing total, so ignore any
+		// Farming StatChanged whose total did not actually go up. This also guards
+		// against other phantom-XP sources we haven't mapped.
+		final int newFarmingXp = event.getXp();
+		if (lastKnownFarmingXp >= 0 && newFarmingXp <= lastKnownFarmingXp) {
+			debugChat("Farming XP event ignored (total did not increase: " + lastKnownFarmingXp + " -> " + newFarmingXp + ")");
+			lastKnownFarmingXp = newFarmingXp;
+			return;
+		}
+		lastKnownFarmingXp = newFarmingXp;
+
+		debugChat("Farming XP event: total=" + newFarmingXp + ", harvestInProgress=" + farmingHarvestInProgress);
 
 		if (!farmingHarvestInProgress) {
 			// No chat trigger fired (e.g., allotments, flowers have no harvest message).
@@ -1263,12 +1329,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 				}
 			}
 		}
-		// Save immediately — trip deletion is destructive and must not be lost
+		// Save immediately — trip deletion is destructive and must not be lost.
+		// allowEmpty=true: deleting the last trip legitimately produces an empty list, which
+		// must be persisted (the empty-overwrite guard would otherwise refuse it). See #26.
 		List<Trip> tripsCopy;
 		synchronized (trips) {
 			tripsCopy = new ArrayList<>(trips);
 		}
-		storageService.saveTripsSync(tripsCopy);
+		storageService.saveTripsSync(tripsCopy, true);
 	}
 
 	public void onTripStatusChanged() {
@@ -1409,13 +1477,32 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	/**
 	 * Sends a debug message to game chat when debug mode is enabled.
 	 */
+	// Developer-only console mirroring of debug output. Enabled via the JVM system
+	// property -Dtriptracker.consoleDebug=true, which the Gradle `run` task sets for
+	// from-source development. It is NOT wired to the plugin's Debug-mode config and is
+	// never set by the published client, so end users are unaffected regardless of their
+	// settings.
+	private static final boolean CONSOLE_DEBUG =
+			Boolean.getBoolean("triptracker.consoleDebug");
+
 	private void debugChat(String message) {
-		if (config.debugMode()) {
+		if (config.debugMode() || CONSOLE_DEBUG) {
 			String timestamp = new SimpleDateFormat("HH:mm:ss.SSS").format(new Date());
-			chatMessageManager.queue(QueuedMessage.builder()
-					.type(ChatMessageType.GAMEMESSAGE)
-					.runeLiteFormattedMessage("[Trip Tracker " + timestamp + "] " + message)
-					.build());
+			String formatted = "[Trip Tracker " + timestamp + "] " + message;
+
+			// In-game chat output — driven solely by the shipped Debug-mode config.
+			if (config.debugMode()) {
+				chatMessageManager.queue(QueuedMessage.builder()
+						.type(ChatMessageType.GAMEMESSAGE)
+						.runeLiteFormattedMessage(formatted)
+						.build());
+			}
+
+			// Console/terminal output — dev-only, gated on the system property so it
+			// never touches an end user's log file.
+			if (CONSOLE_DEBUG) {
+				log.info(formatted);
+			}
 		}
 	}
 

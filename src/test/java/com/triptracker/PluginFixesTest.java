@@ -2,8 +2,8 @@ package com.triptracker;
 
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.NPC;
-import net.runelite.client.events.NpcLootReceived;
+import net.runelite.api.NPCComposition;
+import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import org.junit.Before;
@@ -112,11 +112,11 @@ public class PluginFixesTest {
 
     @Test
     public void testGetListViewDropArrayReturnsDefensiveCopy() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Goblin");
         when(mockNpc.getCombatLevel()).thenReturn(5);
 
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc,
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc,
                 Arrays.asList(new ItemStack(526, 1))));
 
         List<TrackableItemDrop> copy1 = plugin.getListViewDropArray();
@@ -188,11 +188,11 @@ public class PluginFixesTest {
 
     @Test
     public void testClearAllDataResetsEverything() throws Exception {
-        NPC mockNpc = mock(NPC.class);
+        NPCComposition mockNpc = mock(NPCComposition.class);
         when(mockNpc.getName()).thenReturn("Goblin");
         when(mockNpc.getCombatLevel()).thenReturn(5);
 
-        plugin.onNpcLootReceived(new NpcLootReceived(mockNpc,
+        plugin.onServerNpcLoot(new ServerNpcLoot(mockNpc,
                 Arrays.asList(new ItemStack(526, 1))));
         plugin.initTrip("TRIP 1");
 
