@@ -420,6 +420,81 @@ public class TripStorageServiceTest {
         assertEquals("Main Trip", loaded2.get(0).tripName);
     }
 
+    // === Empty-overwrite guard tests (bug #26, layer 2) ===
+
+    @Test
+    public void testEmptyDropsSaveDoesNotOverwriteNonEmptyFile() {
+        // Persist real data
+        List<TrackableItemDrop> drops = new ArrayList<>();
+        drops.add(createDrop("Goblin", 5, 1000L));
+        storageService.saveDropsSync(drops);
+        assertEquals(1, storageService.loadDrops().size());
+
+        // Attempt to save an empty list via the guarded (allowEmpty=false) path
+        storageService.saveDropsSync(new ArrayList<>());
+
+        // File must be untouched — the real data survives
+        List<DropRecord> loaded = storageService.loadDrops();
+        assertEquals("Empty save must not clobber non-empty drops file", 1, loaded.size());
+        assertEquals("Goblin", loaded.get(0).npcName);
+    }
+
+    @Test
+    public void testEmptyTripsSaveDoesNotOverwriteNonEmptyFile() {
+        List<Trip> trips = new ArrayList<>();
+        Trip trip = new Trip("TRIP 1", mockPlugin);
+        trip.setStatus(false);
+        trips.add(trip);
+        storageService.saveTripsSync(trips);
+        assertEquals(1, storageService.loadTrips().size());
+
+        storageService.saveTripsSync(new ArrayList<>());
+
+        List<TripRecord> loaded = storageService.loadTrips();
+        assertEquals("Empty save must not clobber non-empty trips file", 1, loaded.size());
+        assertEquals("TRIP 1", loaded.get(0).tripName);
+    }
+
+    @Test
+    public void testEmptyDropsSaveWithAllowEmptyOverwrites() {
+        List<TrackableItemDrop> drops = new ArrayList<>();
+        drops.add(createDrop("Goblin", 5, 1000L));
+        storageService.saveDropsSync(drops);
+        assertEquals(1, storageService.loadDrops().size());
+
+        // Intentional clear — allowEmpty=true must persist the empty list
+        storageService.saveDropsSync(new ArrayList<>(), true);
+
+        assertTrue("allowEmpty=true must persist an empty drops list",
+                storageService.loadDrops().isEmpty());
+    }
+
+    @Test
+    public void testEmptyTripsSaveWithAllowEmptyOverwrites() {
+        // Mirrors deleting the last trip via removeTrip(), which calls saveTripsSync(list, true)
+        List<Trip> trips = new ArrayList<>();
+        Trip trip = new Trip("TRIP 1", mockPlugin);
+        trip.setStatus(false);
+        trips.add(trip);
+        storageService.saveTripsSync(trips);
+        assertEquals(1, storageService.loadTrips().size());
+
+        storageService.saveTripsSync(new ArrayList<>(), true);
+
+        assertTrue("allowEmpty=true must persist an empty trips list (last-trip deletion)",
+                storageService.loadTrips().isEmpty());
+    }
+
+    @Test
+    public void testEmptySaveOnEmptyFileIsHarmless() {
+        // No existing data — an empty guarded save is a no-op and must not throw or create bad state
+        storageService.saveDropsSync(new ArrayList<>());
+        storageService.saveTripsSync(new ArrayList<>());
+
+        assertTrue(storageService.loadDrops().isEmpty());
+        assertTrue(storageService.loadTrips().isEmpty());
+    }
+
     // Helper to create a simple drop for testing
     private TrackableItemDrop createDrop(String npcName, int combatLevel, long time) {
         TrackableItemDrop drop = new TrackableItemDrop(npcName, combatLevel, time);

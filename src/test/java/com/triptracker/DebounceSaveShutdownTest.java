@@ -32,10 +32,11 @@ import static org.mockito.Mockito.*;
  * Key invariants tested:
  * 1. Each drop triggers an immediate async save.
  * 2. Multiple rapid drops each trigger their own save.
- * 3. Shutdown performs a sync save with all current data.
+ * 3. Shutdown performs a sync save with all current data (when data was loaded this session).
  * 4. Shutdown skips sync save when no account is loaded.
- * 5. Shutdown cancels farming/bird-nest debounce timers.
- * 6. Save data contains the correct number of drops.
+ * 5. Shutdown skips sync save when data was never loaded this session (bug #26 race guard).
+ * 6. Shutdown cancels farming/bird-nest debounce timers.
+ * 7. Save data contains the correct number of drops.
  */
 public class DebounceSaveShutdownTest {
 
@@ -124,6 +125,7 @@ public class DebounceSaveShutdownTest {
         fireNpcDrop("Guard", 21, 526, 1);
 
         setField(plugin, "currentAccountHash", 12345L);
+        setField(plugin, "dataLoaded", true);
         invokeShutDown();
 
         verify(mockStorageService).saveTripsSync(any());
@@ -143,12 +145,28 @@ public class DebounceSaveShutdownTest {
     }
 
     @Test
+    public void testShutdownSkipsSyncSaveWhenDataNotLoaded() throws Exception {
+        // Simulates the #26 race: an account is set (startUp ran) but the deferred
+        // loadPersistedData() has NOT executed, so in-memory state is empty and must not be
+        // written over the real files.
+        setField(plugin, "currentAccountHash", 12345L);
+        setField(plugin, "dataLoaded", false);
+
+        invokeShutDown();
+
+        verify(mockStorageService, never()).saveTripsSync(any());
+        verify(mockStorageService, never()).saveDropsSync(any());
+        verify(mockStorageService, never()).saveLastSessionEpoch(anyLong());
+    }
+
+    @Test
     public void testSyncSaveOnShutdownContainsAllDrops() throws Exception {
         fireNpcDrop("Goblin", 5, 526, 1);
         fireNpcDrop("Guard", 21, 995, 30);
         fireNpcDrop("Man", 2, 526, 1);
 
         setField(plugin, "currentAccountHash", 12345L);
+        setField(plugin, "dataLoaded", true);
         invokeShutDown();
 
         verify(mockStorageService).saveDropsSync(argThat(drops -> drops.size() == 3));
