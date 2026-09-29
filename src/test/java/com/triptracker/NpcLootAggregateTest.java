@@ -25,7 +25,7 @@ public class NpcLootAggregateTest {
         mockItemManager = mock(ItemManager.class);
         mockComposition = mock(ItemComposition.class);
         when(mockItemManager.getItemComposition(anyInt())).thenReturn(mockComposition);
-        when(mockItemManager.getItemPrice(anyInt())).thenReturn(10);
+        when(mockItemManager.getItemPrice(anyInt())).thenReturn(10L);
         when(mockComposition.getMembersName()).thenReturn("Test Item");
         when(mockComposition.getHaPrice()).thenReturn(5);
     }

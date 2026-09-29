@@ -27,8 +27,8 @@ public class DropRecord {
             itemRecord.itemId = item.getItemId();
             itemRecord.itemName = item.getItemName();
             itemRecord.quantity = item.getQuantity();
-            itemRecord.gePrice = (int) (item.getTotalGePrice() / Math.max(item.getQuantity(), 1));
-            itemRecord.haPrice = (int) (item.getTotalHaPrice() / Math.max(item.getQuantity(), 1));
+            itemRecord.gePrice = item.getTotalGePrice() / Math.max(item.getQuantity(), 1);
+            itemRecord.haPrice = item.getTotalHaPrice() / Math.max(item.getQuantity(), 1);
             record.items.add(itemRecord);
         }
 
@@ -50,7 +50,7 @@ public class DropRecord {
         int itemId;
         String itemName;
         long quantity;
-        int gePrice;
-        int haPrice;
+        long gePrice;
+        long haPrice;
     }
 }

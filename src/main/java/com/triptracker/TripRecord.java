@@ -55,8 +55,8 @@ public class TripRecord {
                 itemRecord.itemId = item.getItemId();
                 itemRecord.itemName = item.getItemName();
                 itemRecord.quantity = item.getQuantity();
-                itemRecord.gePrice = (int) (item.getTotalGePrice() / Math.max(item.getQuantity(), 1));
-                itemRecord.haPrice = (int) (item.getTotalHaPrice() / Math.max(item.getQuantity(), 1));
+                itemRecord.gePrice = item.getTotalGePrice() / Math.max(item.getQuantity(), 1);
+                itemRecord.haPrice = item.getTotalHaPrice() / Math.max(item.getQuantity(), 1);
                 aggRecord.items.add(itemRecord);
             }
 
