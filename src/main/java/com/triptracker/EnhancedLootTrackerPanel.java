@@ -514,7 +514,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         } else if (selectedTrackingMode == 1) {
             // Grouped view
-            if (parentPlugin.getListViewDropArray().isEmpty()) {
+            if (parentPlugin.isListViewEmpty()) {
                 lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
             } else {
                 lootBoxPanel.add(buildSubtitleLabel("Sorted by most recent kill"));
@@ -522,7 +522,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             }
         } else {
             // List view
-            if (parentPlugin.getListViewDropArray().isEmpty()) {
+            if (parentPlugin.isListViewEmpty()) {
                 lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
             } else {
                 parentPlugin.rebuildLootPanel();

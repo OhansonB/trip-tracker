@@ -1124,6 +1124,17 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 	}
 
+	/**
+	 * Cheap emptiness check for the drop history. Avoids copying the entire list
+	 * (which getListViewDropArray does) just to test whether any drops exist —
+	 * the rebuild path calls this on every view switch.
+	 */
+	public boolean isListViewEmpty() {
+		synchronized (listViewDropArray) {
+			return listViewDropArray.isEmpty();
+		}
+	}
+
 	public void addDropToTripAggregates(TrackableItemDrop itemDrop) {
 		if (getActiveTrip() != null) {
 			Trip trip = getActiveTrip();
