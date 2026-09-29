@@ -1058,10 +1058,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 			SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 		} else {
-			// Normal UI update (no trimming needed). All three view cards are cached and kept
-			// live (see EnhancedLootTrackerPanel's CardLayout), so every card must be updated on
-			// each drop regardless of which one is currently visible — otherwise a hidden card
-			// goes stale and shows wrong data when the user next switches to it.
+			// The panel caches all three views, so every one must be updated on each drop — not
+			// just the visible one — or a hidden view goes stale until it is next rebuilt.
 			updateListViewUi(newItemDrop);
 			updateGroupedViewUI();
 			updateCurrentTripUi();
@@ -1120,11 +1118,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		}
 	}
 
-	/**
-	 * Cheap emptiness check for the drop history. Avoids copying the entire list
-	 * (which getListViewDropArray does) just to test whether any drops exist —
-	 * the rebuild path calls this on every view switch.
-	 */
 	public boolean isListViewEmpty() {
 		synchronized (listViewDropArray) {
 			return listViewDropArray.isEmpty();
@@ -1296,13 +1289,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		switch (mode) {
 			case LIST:
 				List<TrackableItemDrop> dropsCopy = getListViewDropArray();
-				// Only render the most-recent MAX_LIST_VIEW_BOXES drops. The full history is
-				// retained in listViewDropArray (and fully reflected in the grouped view); this
-				// bounds only how many Swing boxes the list view realizes. Rendering thousands of
-				// boxes made switching AWAY from list view pathologically slow, because
-				// SwingUtil.fastRemoveAll tears the entire tree down component-by-component
-				// (pumping the AWT event queue per component). Capping the realized boxes bounds
-				// that teardown cost. dropsCopy is oldest-first, so the tail is the newest.
+				// Render only the most-recent MAX_LIST_VIEW_BOXES drops. The full history is kept in
+				// listViewDropArray and remains fully reflected in the grouped view; this bounds
+				// only how many Swing boxes the list view realizes. The bound matters because
+				// tearing a large box tree down (SwingUtil.fastRemoveAll) is O(components) and runs
+				// on the EDT, so an unbounded list would make rebuilding/clearing it slow.
+				// dropsCopy is oldest-first, so the tail is the newest.
 				int fromIndex = Math.max(0, dropsCopy.size() - MAX_LIST_VIEW_BOXES);
 				for (TrackableItemDrop itemDrop : dropsCopy.subList(fromIndex, dropsCopy.size())) {
 					panel.addLootBox(itemDrop);
