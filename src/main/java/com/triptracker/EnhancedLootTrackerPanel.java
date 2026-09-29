@@ -24,8 +24,26 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private static final Color FOCUS_COLOR = new Color(0x5E, 0x9E, 0xD6);
 
     private EnhancedLootTrackerPlugin parentPlugin;
+    // Alias for whichever view card is currently active. Rebuild and incremental-add code writes
+    // to this field so it targets the active view without needing to know the mode. Repointed by
+    // changeTrackingMode.
     private JPanel lootBoxPanel;
     private JPanel layoutPanel;
+
+    // Per-mode view cards under a CardLayout. Each is long-lived (built once, kept in memory) so
+    // switching views only changes which card is shown. See buildViewContainer / changeTrackingMode.
+    private JPanel viewContainer;
+    private CardLayout viewCardLayout;
+    private JPanel listCard;
+    private JPanel groupedCard;
+    private JPanel tripCard;
+    private static final String CARD_LIST = "0";
+    private static final String CARD_GROUPED = "1";
+    private static final String CARD_TRIP = "2";
+    // Whether each card (indexed by tracking mode) has been populated. Cards are built lazily on
+    // first visit and kept current by the incremental update paths; the flag is cleared when the
+    // underlying data changes wholesale so the card is rebuilt on next visit.
+    private final boolean[] cardBuilt = new boolean[3];
     private final int DEFAULT_TRACKING_MODE = 0;
     protected int selectedTrackingMode = DEFAULT_TRACKING_MODE;
     private static final ImageIcon GROUPED_MODE_ICON;
@@ -80,6 +98,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     private JPanel filterPanel;
     private JTextField tripFilterField;
     private boolean showHidden = false;
+    // Debounce for the main filter: rebuilding the (up to 500-box) list card on every keystroke
+    // blocks the EDT long enough to drop fast keystrokes. Coalesce rapid edits into one rebuild
+    // shortly after typing pauses.
+    private Timer filterDebounceTimer;
+    private static final int FILTER_DEBOUNCE_MS = 200;
 
     EnhancedLootTrackerPanel() {
         setBorder(new EmptyBorder(6, 6, 6, 6));
@@ -93,7 +116,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         layoutPanel.add(buildTrackingModeControls());
         layoutPanel.add(buildFilterPanel());
-        layoutPanel.add(buildLootBoxPanel());
+        layoutPanel.add(buildViewContainer());
 
         // Footer with clear button
         add(buildFooter(), BorderLayout.SOUTH);
@@ -185,11 +208,22 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     private void onFilterChanged() {
+        // Debounce: restart a short timer on each keystroke; only apply the filter once typing
+        // pauses. This keeps the EDT free while typing (the rebuild is comparatively expensive).
+        if (filterDebounceTimer == null) {
+            filterDebounceTimer = new Timer(FILTER_DEBOUNCE_MS, e -> applyMainFilter());
+            filterDebounceTimer.setRepeats(false);
+        }
+        filterDebounceTimer.restart();
+    }
+
+    private void applyMainFilter() {
         filterText = filterField.getText().trim().toLowerCase();
-        // Rebuild loot entries without triggering intermediate paints
-        lootBoxPanel.setIgnoreRepaint(true);
+        // The filter affects the list (0) and grouped (1) cards; invalidate both so each re-applies
+        // it (the active one now, the other on next visit). Trip view has its own inline filter.
+        cardBuilt[0] = false;
+        cardBuilt[1] = false;
         rebuildLootPanel();
-        lootBoxPanel.setIgnoreRepaint(false);
         filterField.requestFocusInWindow();
     }
 
@@ -424,11 +458,82 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         return panel;
     }
 
-    private JPanel buildLootBoxPanel() {
-        lootBoxPanel = new JPanel();
-        lootBoxPanel.setLayout(new BoxLayout(lootBoxPanel, BoxLayout.Y_AXIS));
+    /**
+     * Builds the CardLayout container holding one long-lived panel per view mode (list, grouped,
+     * trip). Only the active card is shown; the others keep their component trees intact so
+     * switching views is a visibility change rather than a teardown-and-rebuild. The
+     * {@link #lootBoxPanel} field aliases whichever card is currently active, so the rebuild and
+     * incremental-add logic can target "the active view" without knowing which mode it is.
+     */
+    private JPanel buildViewContainer() {
+        viewCardLayout = new CardLayout();
+        // CardLayout reports the preferred size of the LARGEST card. That would size this
+        // container (and therefore push the SOUTH footer) to the biggest view even when a smaller
+        // one is showing. Report the visible card's preferred size instead, so the surrounding
+        // layout hugs whichever view is active.
+        viewContainer = new JPanel(viewCardLayout) {
+            @Override
+            public Dimension getPreferredSize() {
+                for (Component child : getComponents()) {
+                    if (child.isVisible()) {
+                        return child.getPreferredSize();
+                    }
+                }
+                return super.getPreferredSize();
+            }
+        };
 
-        return lootBoxPanel;
+        // Each card's content is a BoxLayout.Y panel (listCard/groupedCard/tripCard). CardLayout
+        // stretches its visible child to fill the container, and inside the scroll viewport that
+        // height exceeds the content, so a bare BoxLayout child would distribute the slack and
+        // leave large gaps between rows. Wrapping each card in a BorderLayout NORTH slot keeps the
+        // content at its preferred height (top-aligned), with any leftover space empty below.
+        listCard = new JPanel();
+        listCard.setLayout(new BoxLayout(listCard, BoxLayout.Y_AXIS));
+        groupedCard = new JPanel();
+        groupedCard.setLayout(new BoxLayout(groupedCard, BoxLayout.Y_AXIS));
+        tripCard = new JPanel();
+        tripCard.setLayout(new BoxLayout(tripCard, BoxLayout.Y_AXIS));
+
+        viewContainer.add(wrapCard(listCard), CARD_LIST);
+        viewContainer.add(wrapCard(groupedCard), CARD_GROUPED);
+        viewContainer.add(wrapCard(tripCard), CARD_TRIP);
+
+        cardBuilt[0] = false;
+        cardBuilt[1] = false;
+        cardBuilt[2] = false;
+
+        lootBoxPanel = cardForMode(selectedTrackingMode);
+        viewCardLayout.show(viewContainer, cardKeyForMode(selectedTrackingMode));
+
+        return viewContainer;
+    }
+
+    /**
+     * Wraps a BoxLayout.Y card in a BorderLayout NORTH slot so CardLayout doesn't stretch it
+     * vertically. See buildViewContainer for why.
+     */
+    private JPanel wrapCard(JPanel card) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        wrapper.add(card, BorderLayout.NORTH);
+        return wrapper;
+    }
+
+    private JPanel cardForMode(int mode) {
+        switch (mode) {
+            case 1: return groupedCard;
+            case 2: return tripCard;
+            default: return listCard;
+        }
+    }
+
+    private String cardKeyForMode(int mode) {
+        switch (mode) {
+            case 1: return CARD_GROUPED;
+            case 2: return CARD_TRIP;
+            default: return CARD_LIST;
+        }
     }
 
     private JPanel buildTripTrackerControls() {
@@ -493,9 +598,13 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     // when switching between view modes, and eventually when re-building the loot tracker from scratch between
     // sessions using persisted data.
     private void rebuildLootPanel() {
-        // Remove all components from lootBoxPanel
+        // Remove all components from the active card being (re)built.
         SwingUtil.fastRemoveAll(lootBoxPanel);
-        listViewPanelBoxes.clear();
+        // Only the list card owns listViewPanelBoxes; don't wipe its tracking list when we're
+        // rebuilding a different card (that would desync the list card's boxes from the tracker).
+        if (selectedTrackingMode == 0) {
+            listViewPanelBoxes.clear();
+        }
 
         // Show/hide the main filter panel based on mode (trip view uses its own inline filter)
         if (filterPanel != null) {
@@ -514,7 +623,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         } else if (selectedTrackingMode == 1) {
             // Grouped view
-            if (parentPlugin.getListViewDropArray().isEmpty()) {
+            if (parentPlugin.isListViewEmpty()) {
                 lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
             } else {
                 lootBoxPanel.add(buildSubtitleLabel("Sorted by most recent kill"));
@@ -522,12 +631,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             }
         } else {
             // List view
-            if (parentPlugin.getListViewDropArray().isEmpty()) {
+            if (parentPlugin.isListViewEmpty()) {
                 lootBoxPanel.add(buildEmptyStateLabel("No drops tracked yet. Kill something to get started!"));
             } else {
                 parentPlugin.rebuildLootPanel();
             }
         }
+
+        // Mark this card as populated so switching to it later is a pure show (no rebuild).
+        cardBuilt[selectedTrackingMode] = true;
 
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
@@ -577,12 +689,22 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             newDropBox.setExcludedItems(parentPlugin.getExcludedItems());
         }
         listViewPanelBoxes.add(0, newDropBox);
-        lootBoxPanel.add(newDropBox.buildPanelBox(),0);
-        // Only repaint if the panel is already attached (skip during off-screen rebuild)
-        if (lootBoxPanel.getParent() != null) {
-            lootBoxPanel.revalidate();
-            lootBoxPanel.repaint();
+        // Add to the card directly rather than the lootBoxPanel alias: this runs on every drop,
+        // possibly while another view is active, and must still reach the (hidden) list card.
+        listCard.add(newDropBox.buildPanelBox(), 0);
+
+        // Enforce MAX_LIST_VIEW_BOXES. Newest is at index 0, so the oldest box is the trailing
+        // component (the list card holds only drop boxes, no headers).
+        while (listViewPanelBoxes.size() > EnhancedLootTrackerPlugin.MAX_LIST_VIEW_BOXES) {
+            listViewPanelBoxes.remove(listViewPanelBoxes.size() - 1);
+            int last = listCard.getComponentCount() - 1;
+            if (last >= 0) {
+                listCard.remove(last);
+            }
         }
+
+        listCard.revalidate();
+        listCard.repaint();
     }
 
     public void addLootBox(NpcLootAggregate npcLootAggregate, ArrayList<LootAggregation> lootAggregation, int tripId) {
@@ -639,7 +761,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             activeTripLootPanels = tripLootPanels;
         }
 
-        if (selectedTrackingMode == 2 && activeTripPanel != null) {
+        // Not gated on the visible mode: the TripPanel's lootPanel lives in the trip card and must
+        // stay current even while another view is showing.
+        if (activeTripPanel != null) {
             activeTripPanel.addLootPanel(newLootPanel);
         }
     }
@@ -672,7 +796,8 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         JPanel newLootPanel = newDropBox.buildPanelBox();
 
         if (groupedLootBoxPanels.containsKey(npcName)) {
-            lootBoxPanel.remove(groupedLootBoxPanels.get(npcName));
+            // Target the grouped card directly (not the alias): may run while another view is active.
+            groupedCard.remove(groupedLootBoxPanels.get(npcName));
             groupedLootBoxPanels.remove(npcName);
             groupedLootBoxPanels.put(npcName, newLootPanel);
             groupedPanelBoxes.remove(npcName);
@@ -683,25 +808,51 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             groupedPanelBoxes.put(npcName, newDropBox);
         }
 
-        if (selectedTrackingMode == 1) {
-            // Apply NPC name filter
-            if (!filterText.isEmpty() && !npcName.toLowerCase().contains(filterText)) {
-                return;
-            }
-            lootBoxPanel.add(newLootPanel, 0);
-            // Only repaint if the panel is already attached (skip during off-screen rebuild)
-            if (lootBoxPanel.getParent() != null) {
-                lootBoxPanel.revalidate();
-                lootBoxPanel.repaint();
-            }
+        // Apply NPC name filter (skip adding a box that doesn't match the active filter).
+        if (!filterText.isEmpty() && !npcName.toLowerCase().contains(filterText)) {
+            return;
         }
+        groupedCard.add(newLootPanel, 0); // newest first
+        groupedCard.revalidate();
+        groupedCard.repaint();
     }
 
     private void changeTrackingMode(int newTrackingModeType) {
         if (newTrackingModeType != selectedTrackingMode) {
             selectedTrackingMode = newTrackingModeType;
+            lootBoxPanel = cardForMode(selectedTrackingMode);
+            // The main filter applies to list and grouped only; trip view has its own inline filter.
+            if (filterPanel != null) {
+                filterPanel.setVisible(selectedTrackingMode != 2);
+            }
+            buildActiveCardIfNeeded();
+            viewCardLayout.show(viewContainer, cardKeyForMode(selectedTrackingMode));
+        }
+    }
+
+    /**
+     * Builds the active card on its first visit. Once built, a card is kept current by the
+     * incremental update paths, so this is a no-op thereafter.
+     */
+    private void buildActiveCardIfNeeded() {
+        if (!cardBuilt[selectedTrackingMode]) {
             rebuildLootPanel();
         }
+    }
+
+    /**
+     * Tears down all three cards and marks them unbuilt, forcing a fresh build on next visit.
+     * Used when the underlying data changes wholesale (load, clear, exclusion/display-setting
+     * change) so no card retains stale content. Callers typically rebuild the active card
+     * immediately afterwards; the others rebuild lazily when next shown.
+     */
+    private void invalidateAllCards() {
+        SwingUtil.fastRemoveAll(listCard);
+        SwingUtil.fastRemoveAll(groupedCard);
+        SwingUtil.fastRemoveAll(tripCard);
+        cardBuilt[0] = false;
+        cardBuilt[1] = false;
+        cardBuilt[2] = false;
     }
 
     /**
@@ -762,13 +913,11 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
      * Called after persisted data has been loaded to refresh the current view.
      */
     public void rebuildAfterLoad() {
-        // Build a fresh loot box panel off-screen to avoid intermediate repaints
-        JPanel newLootBoxPanel = new JPanel();
-        newLootBoxPanel.setLayout(new BoxLayout(newLootBoxPanel, BoxLayout.Y_AXIS));
+        lootBoxPanel = cardForMode(selectedTrackingMode);
 
-        // Swap the reference so all rebuild methods populate the new panel
-        JPanel oldPanel = lootBoxPanel;
-        lootBoxPanel = newLootBoxPanel;
+        // The data changed wholesale, so no card's contents are valid; the active one is rebuilt
+        // below and the others rebuild lazily on next visit.
+        invalidateAllCards();
 
         // Clear existing trip panel state to rebuild with current exclusion/display settings
         tripsMap.clear();
@@ -817,13 +966,6 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
         collapsedNpcs = savedCollapsedNpcs;
 
         rebuildLootPanel();
-
-        // Swap the old panel for the new one in a single operation
-        int index = layoutPanel.getComponentZOrder(oldPanel);
-        layoutPanel.remove(oldPanel);
-        layoutPanel.add(lootBoxPanel, index);
-        layoutPanel.revalidate();
-        layoutPanel.repaint();
     }
 
     private void createNewTrip() {
@@ -971,7 +1113,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         layoutPanel.add(buildTrackingModeControls());
         layoutPanel.add(buildFilterPanel());
-        layoutPanel.add(buildLootBoxPanel());
+        layoutPanel.add(buildViewContainer());
         add(buildFooter(), BorderLayout.SOUTH);
 
         // Switch to trip view and rebuild
@@ -989,11 +1131,15 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
      * Called after all data has been cleared to reset the panel state.
      */
     public void rebuildAfterClear() {
+        invalidateAllCards();
         tripsMap.clear();
         tripPanelBoxes.clear();
+        listViewPanelBoxes.clear();
         groupedLootBoxPanels.clear();
+        groupedPanelBoxes.clear();
         activeTripLootPanels.clear();
         collapsedNpcs.clear();
+        lootBoxPanel = cardForMode(selectedTrackingMode);
         rebuildLootPanel();
     }
 }

@@ -195,6 +195,13 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private EnhancedLootTrackerPanel panel;
 	private NavigationButton navButton;
 	private final List<TrackableItemDrop> listViewDropArray = Collections.synchronizedList(new ArrayList<>());
+
+	/**
+	 * Maximum number of individual drop boxes the list view will render. The full drop history is
+	 * still retained and aggregated (grouped view shows everything); this only bounds how many
+	 * Swing components the list view realizes, which keeps switching between views responsive.
+	 */
+	static final int MAX_LIST_VIEW_BOXES = 500;
 	private String lastNpcKilled;
 	private final List<NpcLootAggregate> npcLootAggregates = Collections.synchronizedList(new ArrayList<>());
 	private final List<Trip> trips = Collections.synchronizedList(new ArrayList<>());
@@ -1051,24 +1058,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 
 			SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 		} else {
-			// Normal UI update (no trimming needed)
-			TrackingMode trackingMode = TrackingMode.fromId(panel.getSelectedTrackingMode());
-			switch (trackingMode) {
-				case LIST:
-					updateListViewUi(newItemDrop);
-					updateGroupedViewUI();
-					updateCurrentTripUi();
-					break;
-
-				case GROUPED:
-				case TRIP:
-					updateGroupedViewUI();
-					updateCurrentTripUi();
-					break;
-
-				default:
-					break;
-			}
+			// The panel caches all three views, so every one must be updated on each drop — not
+			// just the visible one — or a hidden view goes stale until it is next rebuilt.
+			updateListViewUi(newItemDrop);
+			updateGroupedViewUI();
+			updateCurrentTripUi();
 		}
 
 		// Persist immediately (async via writeExecutor)
@@ -1121,6 +1115,12 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public List<TrackableItemDrop> getListViewDropArray() {
 		synchronized (listViewDropArray) {
 			return new ArrayList<>(listViewDropArray);
+		}
+	}
+
+	public boolean isListViewEmpty() {
+		synchronized (listViewDropArray) {
+			return listViewDropArray.isEmpty();
 		}
 	}
 
@@ -1289,7 +1289,14 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		switch (mode) {
 			case LIST:
 				List<TrackableItemDrop> dropsCopy = getListViewDropArray();
-				for (TrackableItemDrop itemDrop : dropsCopy) {
+				// Render only the most-recent MAX_LIST_VIEW_BOXES drops. The full history is kept in
+				// listViewDropArray and remains fully reflected in the grouped view; this bounds
+				// only how many Swing boxes the list view realizes. The bound matters because
+				// tearing a large box tree down (SwingUtil.fastRemoveAll) is O(components) and runs
+				// on the EDT, so an unbounded list would make rebuilding/clearing it slow.
+				// dropsCopy is oldest-first, so the tail is the newest.
+				int fromIndex = Math.max(0, dropsCopy.size() - MAX_LIST_VIEW_BOXES);
+				for (TrackableItemDrop itemDrop : dropsCopy.subList(fromIndex, dropsCopy.size())) {
 					panel.addLootBox(itemDrop);
 				}
 				break;
@@ -1297,7 +1304,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 			case GROUPED:
 				synchronized (npcLootAggregates) {
 					for (NpcLootAggregate npcAggregate : npcLootAggregates) {
-						String npcName = npcAggregate.getNpcName();
 						ArrayList<LootAggregation> npcsLootAggregation = npcAggregate.getNpcItemAggregations();
 						if (npcsLootAggregation != null) {
 							panel.addLootBox(npcAggregate, npcsLootAggregation);
