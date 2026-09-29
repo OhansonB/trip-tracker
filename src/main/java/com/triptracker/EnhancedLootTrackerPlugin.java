@@ -978,8 +978,11 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	private TrackableDroppedItem buildTrackableItem(int itemId, int quantity)
 	{
 		final ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-		final int gePrice = itemManager.getItemPrice(itemId);
-		final int haPrice = itemComposition.getHaPrice();
+		// Prices are stored as long throughout: RuneLite's getItemPrice now returns a
+		// long in anticipation of item/cash-stack values exceeding Integer.MAX_VALUE.
+		// getHaPrice() still returns int and widens cleanly.
+		final long gePrice = itemManager.getItemPrice(itemId);
+		final long haPrice = itemComposition.getHaPrice();
 
 		return new TrackableDroppedItem(
 				itemId,

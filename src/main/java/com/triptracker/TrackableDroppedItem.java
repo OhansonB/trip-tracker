@@ -8,10 +8,10 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
     private final int itemId;
     private final String itemName;
     private final long quantity;
-    private final int gePrice;
-    private final int haPrice;
+    private final long gePrice;
+    private final long haPrice;
 
-    TrackableDroppedItem(int itemId, String itemName, long quantity, int gePrice, int haPrice) {
+    TrackableDroppedItem(int itemId, String itemName, long quantity, long gePrice, long haPrice) {
         this.itemId = itemId;
         this.itemName = itemName;
         this.quantity = quantity;
@@ -20,11 +20,11 @@ public class TrackableDroppedItem implements Comparable<TrackableDroppedItem> {
     }
 
     long getTotalGePrice() {
-        return (long) gePrice * quantity;
+        return gePrice * quantity;
     }
 
     long getTotalHaPrice() {
-        return (long) haPrice * quantity;
+        return haPrice * quantity;
     }
 
     String describeTrackableDroppedItem() {

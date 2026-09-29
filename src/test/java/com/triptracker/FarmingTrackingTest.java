@@ -47,7 +47,7 @@ public class FarmingTrackingTest {
 
         // Default item composition mock
         when(mockItemManager.getItemComposition(anyInt())).thenReturn(mockComposition);
-        when(mockItemManager.getItemPrice(anyInt())).thenReturn(100);
+        when(mockItemManager.getItemPrice(anyInt())).thenReturn(100L);
         when(mockComposition.getMembersName()).thenReturn("Test Item");
         when(mockComposition.getHaPrice()).thenReturn(50);
         when(mockComposition.getNote()).thenReturn(-1);

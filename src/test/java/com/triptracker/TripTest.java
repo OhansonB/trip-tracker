@@ -390,7 +390,7 @@ public class TripTest {
         net.runelite.client.game.ItemManager mockItemManager = Mockito.mock(net.runelite.client.game.ItemManager.class);
         net.runelite.api.ItemComposition mockComp = Mockito.mock(net.runelite.api.ItemComposition.class);
         Mockito.when(mockItemManager.getItemComposition(Mockito.anyInt())).thenReturn(mockComp);
-        Mockito.when(mockItemManager.getItemPrice(Mockito.anyInt())).thenReturn(10);
+        Mockito.when(mockItemManager.getItemPrice(Mockito.anyInt())).thenReturn(10L);
         Mockito.when(mockComp.getMembersName()).thenReturn("Test");
         Mockito.when(mockComp.getHaPrice()).thenReturn(5);
 

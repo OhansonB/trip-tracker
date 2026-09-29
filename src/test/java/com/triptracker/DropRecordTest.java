@@ -50,6 +50,25 @@ public class DropRecordTest {
     }
 
     @Test
+    public void testLargePriceSurvivesRoundTripWithoutTruncation() {
+        // Jagex is widening item/cash-stack values beyond Integer.MAX_VALUE, and
+        // RuneLite's getItemPrice now returns a long. A per-unit price above the int
+        // ceiling must survive drop -> record -> drop without truncating or going negative.
+        long bigPrice = (long) Integer.MAX_VALUE + 1_000_000L; // ~2.148b, overflows int
+        TrackableItemDrop original = new TrackableItemDrop("Boss", 500, 1000000L);
+        original.addLootToDrop(new TrackableDroppedItem(1234, "Huge stack", 1, bigPrice, 0));
+
+        // Per-unit price is preserved intact in the serialized record
+        DropRecord record = DropRecord.fromDrop(original);
+        assertEquals(bigPrice, record.items.get(0).gePrice);
+
+        // And after a full restore the total value is intact (no int overflow)
+        TrackableItemDrop restored = record.toDrop();
+        assertEquals(bigPrice, restored.getTotalDropGeValue());
+        assertTrue("value must not go negative from int overflow", restored.getTotalDropGeValue() > 0);
+    }
+
+    @Test
     public void testEmptyDrop() {
         TrackableItemDrop drop = new TrackableItemDrop("Chicken", 1);
         DropRecord record = DropRecord.fromDrop(drop);

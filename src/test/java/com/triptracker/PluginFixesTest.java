@@ -41,7 +41,7 @@ public class PluginFixesTest {
         mockStorageService = mock(TripStorageService.class);
 
         when(mockItemManager.getItemComposition(anyInt())).thenReturn(mockComposition);
-        when(mockItemManager.getItemPrice(anyInt())).thenReturn(10);
+        when(mockItemManager.getItemPrice(anyInt())).thenReturn(10L);
         when(mockComposition.getMembersName()).thenReturn("Test Item");
         when(mockComposition.getHaPrice()).thenReturn(5);
         when(mockPanel.getSelectedTrackingMode()).thenReturn(0);

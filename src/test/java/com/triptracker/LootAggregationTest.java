@@ -28,7 +28,7 @@ public class LootAggregationTest {
         ItemComposition mockComposition = mock(ItemComposition.class);
 
         when(mockItemManager.getItemComposition(anyInt())).thenReturn(mockComposition);
-        when(mockItemManager.getItemPrice(anyInt())).thenReturn(100);
+        when(mockItemManager.getItemPrice(anyInt())).thenReturn(100L);
         when(mockComposition.getMembersName()).thenReturn("Dragon Bones");
         when(mockComposition.getHaPrice()).thenReturn(50);
     }
@@ -101,9 +101,9 @@ public class LootAggregationTest {
 
         ItemManager im = mock(ItemManager.class);
         when(im.getItemComposition(1)).thenReturn(mockComp1);
-        when(im.getItemPrice(1)).thenReturn(10);
+        when(im.getItemPrice(1)).thenReturn(10L);
         when(im.getItemComposition(2)).thenReturn(mockComp2);
-        when(im.getItemPrice(2)).thenReturn(1000);
+        when(im.getItemPrice(2)).thenReturn(1000L);
 
         LootAggregation cheap = new LootAggregation(1, 1, im);
         LootAggregation expensive = new LootAggregation(2, 1, im);
