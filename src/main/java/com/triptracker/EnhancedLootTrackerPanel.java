@@ -934,6 +934,19 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     public int getSelectedTrackingMode() { return selectedTrackingMode; }
 
     /**
+     * Refreshes after a hide/unhide. Trip view updates in place (no flash); list/grouped have no
+     * in-place path yet, so they fall back to a full rebuild (flash imperceptible there).
+     */
+    public void refreshAfterExclusionChange() {
+        if (selectedTrackingMode == 2) {
+            applyTripExclusionState();
+            rebuildTripEntries();
+        } else {
+            rebuildAfterLoad();
+        }
+    }
+
+    /**
      * Called after persisted data has been loaded to refresh the current view.
      */
     public void rebuildAfterLoad() {
