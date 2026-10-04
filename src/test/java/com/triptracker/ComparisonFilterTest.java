@@ -123,7 +123,145 @@ public class ComparisonFilterTest {
         assertTrue(vorkBox.isSelected());
     }
 
+    // === Filter-aware All / None ===
+
+    @Test
+    public void selectAllVisibleWithFilterActive() throws Exception {
+        int guards1 = trips.get(0).getTripId();
+        int guards2 = trips.get(1).getTripId();
+        int zulrahId = trips.get(3).getTripId();
+
+        // A selected trip that the filter will hide.
+        addSelectedId(zulrahId);
+
+        applyFilter("guards");
+        selectVisible();
+
+        Set<Integer> ids = selectedTripIds();
+        assertTrue("Visible 'Guards 1' should be selected", ids.contains(guards1));
+        assertTrue("Visible 'Guards 2' should be selected", ids.contains(guards2));
+        assertTrue("Filtered-out 'Zulrah' must stay selected", ids.contains(zulrahId));
+    }
+
+    @Test
+    public void deselectAllVisibleWithFilterActive() throws Exception {
+        int guards1 = trips.get(0).getTripId();
+        int guards2 = trips.get(1).getTripId();
+        int vorkathId = trips.get(2).getTripId();
+        int zulrahId = trips.get(3).getTripId();
+
+        // Select every trip, then filter to a subset and deselect-visible.
+        addSelectedId(guards1);
+        addSelectedId(guards2);
+        addSelectedId(vorkathId);
+        addSelectedId(zulrahId);
+
+        applyFilter("guards");
+        deselectVisible();
+
+        Set<Integer> ids = selectedTripIds();
+        assertFalse("Visible 'Guards 1' should be deselected", ids.contains(guards1));
+        assertFalse("Visible 'Guards 2' should be deselected", ids.contains(guards2));
+        assertTrue("Filtered-out 'Vorkath' must stay selected", ids.contains(vorkathId));
+        assertTrue("Filtered-out 'Zulrah' must stay selected", ids.contains(zulrahId));
+    }
+
+    @Test
+    public void noFilterSelectAllThenNoneHasNoRegression() throws Exception {
+        // No filter: All selects every trip, None clears every selection.
+        applyFilter("");
+        selectVisible();
+
+        Set<Integer> all = new HashSet<>();
+        for (Trip t : trips) {
+            all.add(t.getTripId());
+        }
+        assertEquals("All (no filter) should select every trip", all, selectedTripIds());
+
+        deselectVisible();
+        assertTrue("None (no filter) should clear every selection", selectedTripIds().isEmpty());
+    }
+
+    @Test
+    public void workedExampleSelectionPersistsAcrossFilterAndButtons() throws Exception {
+        int guards1 = trips.get(0).getTripId();
+        int guards2 = trips.get(1).getTripId();
+        int vorkathId = trips.get(2).getTripId();
+        int zulrahId = trips.get(3).getTripId();
+
+        // Pre-select a trip that will be filtered out (the "Zulrah" in the example).
+        addSelectedId(zulrahId);
+
+        // Filter to the matching subset and select everything visible.
+        applyFilter("guards");
+        selectVisible();
+
+        Set<Integer> afterSelect = selectedTripIds();
+        assertTrue(afterSelect.contains(guards1));
+        assertTrue(afterSelect.contains(guards2));
+        assertTrue("Pre-selected filtered-out trip stays selected", afterSelect.contains(zulrahId));
+        assertFalse("Non-matching 'Vorkath' not selected", afterSelect.contains(vorkathId));
+
+        // Deselect everything visible: only the Guards go, Zulrah stays.
+        deselectVisible();
+        Set<Integer> afterDeselect = selectedTripIds();
+        assertFalse(afterDeselect.contains(guards1));
+        assertFalse(afterDeselect.contains(guards2));
+        assertTrue("Filtered-out 'Zulrah' still selected", afterDeselect.contains(zulrahId));
+
+        // Clear the filter: Guards render unchecked, Zulrah checked, Vorkath unchecked.
+        applyFilter("");
+        assertFalse(checkboxByLabel("Guards 1").isSelected());
+        assertFalse(checkboxByLabel("Guards 2").isSelected());
+        assertTrue(checkboxByLabel("Zulrah").isSelected());
+        assertFalse(checkboxByLabel("Vorkath").isSelected());
+    }
+
     // === Helpers ===
+
+    /**
+     * Mirrors the "All" button handler: on the EDT, for every trip matching the
+     * active filter (via the panel's private {@code matchesFilter}), add its id.
+     */
+    private void selectVisible() throws Exception {
+        onEdt(() -> {
+            try {
+                Set<Integer> ids = selectedTripIds();
+                for (Trip trip : trips) {
+                    if (matchesFilter(trip)) {
+                        ids.add(trip.getTripId());
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * Mirrors the "None" button handler: on the EDT, for every trip matching the
+     * active filter, remove its id (never clear()).
+     */
+    private void deselectVisible() throws Exception {
+        onEdt(() -> {
+            try {
+                Set<Integer> ids = selectedTripIds();
+                for (Trip trip : trips) {
+                    if (matchesFilter(trip)) {
+                        ids.remove(trip.getTripId());
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    private boolean matchesFilter(Trip trip) throws Exception {
+        Method m = findMethod(panel.getClass(), "matchesFilter", Trip.class);
+        m.setAccessible(true);
+        return (Boolean) m.invoke(panel, trip);
+    }
 
     /**
      * Sets filterText directly and invokes rebuildChecklist() on the EDT, bypassing
@@ -220,6 +358,17 @@ public class ComparisonFilterTest {
         while (clazz != null) {
             try {
                 return clazz.getDeclaredMethod(methodName);
+            } catch (NoSuchMethodException e) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        throw new NoSuchMethodException(methodName);
+    }
+
+    private Method findMethod(Class<?> clazz, String methodName, Class<?>... paramTypes) throws NoSuchMethodException {
+        while (clazz != null) {
+            try {
+                return clazz.getDeclaredMethod(methodName, paramTypes);
             } catch (NoSuchMethodException e) {
                 clazz = clazz.getSuperclass();
             }

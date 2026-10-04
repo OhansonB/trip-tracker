@@ -83,8 +83,12 @@ public class TripComparisonPanel extends JPanel {
         selectAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         selectAllButton.getAccessibleContext().setAccessibleName("Select all trips");
         selectAllButton.addActionListener(e -> {
+            // Operate only on trips matching the active filter; filtered-out
+            // trips keep their current selection state.
             for (Trip trip : allTrips) {
-                selectedTripIds.add(trip.getTripId());
+                if (matchesFilter(trip)) {
+                    selectedTripIds.add(trip.getTripId());
+                }
             }
             rebuildChecklist();
             rebuildTable();
@@ -104,7 +108,13 @@ public class TripComparisonPanel extends JPanel {
         deselectAllButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         deselectAllButton.getAccessibleContext().setAccessibleName("Deselect all trips");
         deselectAllButton.addActionListener(e -> {
-            selectedTripIds.clear();
+            // Deselect only trips matching the active filter; filtered-out
+            // trips keep their current selection state (do NOT clear()).
+            for (Trip trip : allTrips) {
+                if (matchesFilter(trip)) {
+                    selectedTripIds.remove(trip.getTripId());
+                }
+            }
             rebuildChecklist();
             rebuildTable();
         });
@@ -237,11 +247,20 @@ public class TripComparisonPanel extends JPanel {
         rebuildChecklist();
     }
 
+    /**
+     * Single source of truth for which trips are currently visible in the
+     * checklist. Both {@link #rebuildChecklist()} and the "All"/"None" button
+     * handlers use this so "visible" and "affected by All/None" can never diverge.
+     */
+    private boolean matchesFilter(Trip trip) {
+        return filterText.isEmpty() || trip.getTripName().toLowerCase().contains(filterText);
+    }
+
     private void rebuildChecklist() {
         checklistPanel.removeAll();
         int shown = 0;
         for (Trip trip : allTrips) {
-            if (!filterText.isEmpty() && !trip.getTripName().toLowerCase().contains(filterText)) {
+            if (!matchesFilter(trip)) {
                 continue;
             }
             JCheckBox checkBox = new JCheckBox(trip.getTripName());
