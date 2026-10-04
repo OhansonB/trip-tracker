@@ -276,7 +276,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             tripShowHiddenButton.setText(showHidden ? "\u25CF" : "\u25CB");
             tripShowHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
             tripShowHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
-            rebuildAfterLoad();
+            // Update in place instead of rebuildAfterLoad() to avoid the full-panel flash.
+            applyTripExclusionState();
+            rebuildTripEntries();
         });
 
         collapsePanel.add(tripShowHiddenButton);
@@ -359,6 +361,28 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
+    }
+
+    /**
+     * Re-syncs the excluded sets on the already-built trip objects to the current {@code showHidden}
+     * state (empty when showing hidden, else the plugin's sets), matching the gating in
+     * {@link #rebuildAfterLoad()} so an in-place {@link #rebuildTripEntries()} shows the same set.
+     */
+    private void applyTripExclusionState() {
+        for (TripPanel tripPanel : tripsMap.values()) {
+            if (showHidden) {
+                tripPanel.setExcludedItems(new HashSet<>());
+                tripPanel.setExcludedNpcs(new HashSet<>());
+            } else {
+                tripPanel.setExcludedItems(parentPlugin.getExcludedItems());
+                tripPanel.setExcludedNpcs(parentPlugin.getExcludedNpcs());
+            }
+        }
+        for (LinkedHashMap<String, LootTrackingPanelBox> lootPanels : tripPanelBoxes.values()) {
+            for (LootTrackingPanelBox panelBox : lootPanels.values()) {
+                panelBox.setExcludedItems(showHidden ? new HashSet<>() : parentPlugin.getExcludedItems());
+            }
+        }
     }
 
     private JPanel buildTrackingModeControls() {
@@ -908,6 +932,19 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     public int getSelectedTrackingMode() { return selectedTrackingMode; }
+
+    /**
+     * Refreshes after a hide/unhide. Trip view updates in place (no flash); list/grouped have no
+     * in-place path yet, so they fall back to a full rebuild (flash imperceptible there).
+     */
+    public void refreshAfterExclusionChange() {
+        if (selectedTrackingMode == 2) {
+            applyTripExclusionState();
+            rebuildTripEntries();
+        } else {
+            rebuildAfterLoad();
+        }
+    }
 
     /**
      * Called after persisted data has been loaded to refresh the current view.

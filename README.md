@@ -153,6 +153,22 @@ Items and NPCs can also be excluded by right-clicking them directly in the panel
 
 ## Release Notes
 
+### v1.3.0
+
+- Add a filter to the trip comparison screen. The list of trips you can pick for comparison now has a search field (filter by trip name), so selecting from a long trip list is quicker.
+- "All" and "None" on the comparison screen now apply to the trips matching the current filter, rather than the whole list. Filtering to "clue scroll" and pressing "All" selects just those trips, and trips hidden by the filter keep their existing selection.
+- Fix the trip view flashing the whole panel when toggling show/hide excluded or hiding/unhiding an item or NPC. These now update in place without the visible redraw.
+
+### v1.2.0
+
+- Improve view-switching performance on large drop histories. Views are now cached and switching between them is instant, instead of rebuilding the panel each time.
+- Cap the list view at the 500 most recent drops to keep it responsive. The full history is retained and still aggregated in the grouped view.
+- Debounce the name filter so fast typing no longer drops keystrokes while the panel updates.
+
+### v1.1.0
+
+- Support item and cash-stack values above the previous integer ceiling, matching a RuneLite change. Very high-value loot is no longer truncated or shown as a negative value.
+
 ### v1.0.1
 
 - Fix a startup/shutdown race where disabling, reloading, or crashing the plugin before its saved data finished loading could overwrite the stored trips and drops with empty data.
