@@ -26,16 +26,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Verifies the trip-view "show/hide excluded items" toggle updates the shown set IN PLACE rather
- * than tearing down and rebuilding the whole panel (the cause of the visible flash).
- *
- * The toggle handler flips {@code showHidden}, then runs {@code applyTripExclusionState()} followed
- * by {@code rebuildTripEntries()} — the established low-flash path. These tests drive that same
- * logic (both private, reached by reflection) and assert on internal state: that the cached
- * {@link TripPanel} / {@link LootTrackingPanelBox} instances are reused (identity preserved, i.e.
- * no full rebuild recreated them) and that their excluded sets are re-synced to match the toggle.
- *
- * Asserts on internal state rather than Swing rendering, per the testing standards.
+ * Verifies the trip-view "show/hide excluded items" toggle updates in place
+ * ({@code applyTripExclusionState()} + {@code rebuildTripEntries()}, reached by reflection) rather
+ * than rebuilding the whole panel — the cause of the visible flash. Asserts on internal state
+ * (instance reuse and re-synced excluded sets), not Swing rendering, per the testing standards.
  */
 public class TripExclusionToggleTest {
 
@@ -91,9 +85,7 @@ public class TripExclusionToggleTest {
         trips.add(trip);
         when(mockPlugin.getTrips()).thenReturn(trips);
 
-        // Populate tripsMap / tripPanelBoxes exactly as the real load path does. Run on the EDT
-        // because the rebuild touches Swing (SwingUtil.fastRemoveAll asserts it is on the EDT),
-        // matching how the real panel invokes it.
+        // On the EDT because the rebuild touches Swing (SwingUtil.fastRemoveAll asserts the EDT).
         onEdt(panel::rebuildAfterLoad);
     }
 
@@ -104,7 +96,6 @@ public class TripExclusionToggleTest {
         assertNotNull("trip panel should exist after load", tripBefore);
         assertNotNull("loot box should exist after load", boxBefore);
 
-        // Simulate the toggle: flip showHidden, re-sync exclusion state, rebuild entries in place.
         setField(panel, "showHidden", true);
         onEdt(() -> {
             invokePrivate("applyTripExclusionState");

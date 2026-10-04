@@ -276,8 +276,7 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             tripShowHiddenButton.setText(showHidden ? "\u25CF" : "\u25CB");
             tripShowHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
             tripShowHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
-            // Re-sync the cached objects' excluded sets to the flipped showHidden, then rebuild
-            // only the trip entries in place — avoids the full-panel flash of rebuildAfterLoad().
+            // Update in place instead of rebuildAfterLoad() to avoid the full-panel flash.
             applyTripExclusionState();
             rebuildTripEntries();
         });
@@ -365,11 +364,9 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
     }
 
     /**
-     * Re-syncs the excluded item/NPC sets cached on the already-built trip objects to match the
-     * current {@code showHidden} state, without recreating any object. Mirrors the exact gating in
-     * {@link #rebuildAfterLoad()}: when showing hidden, the excluded sets are emptied; otherwise
-     * they are set to the plugin's excluded sets. This lets the trip-view toggle rebuild only the
-     * entry rows (via {@link #rebuildTripEntries()}) in place instead of tearing down the panel.
+     * Re-syncs the excluded sets on the already-built trip objects to the current {@code showHidden}
+     * state (empty when showing hidden, else the plugin's sets), matching the gating in
+     * {@link #rebuildAfterLoad()} so an in-place {@link #rebuildTripEntries()} shows the same set.
      */
     private void applyTripExclusionState() {
         for (TripPanel tripPanel : tripsMap.values()) {
