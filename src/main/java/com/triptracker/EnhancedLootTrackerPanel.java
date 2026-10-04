@@ -276,7 +276,10 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
             tripShowHiddenButton.setText(showHidden ? "\u25CF" : "\u25CB");
             tripShowHiddenButton.setForeground(showHidden ? Color.GREEN : ColorScheme.LIGHT_GRAY_COLOR);
             tripShowHiddenButton.setToolTipText(showHidden ? "Hide excluded items/NPCs" : "Show hidden items/NPCs");
-            rebuildAfterLoad();
+            // Re-sync the cached objects' excluded sets to the flipped showHidden, then rebuild
+            // only the trip entries in place — avoids the full-panel flash of rebuildAfterLoad().
+            applyTripExclusionState();
+            rebuildTripEntries();
         });
 
         collapsePanel.add(tripShowHiddenButton);
@@ -359,6 +362,30 @@ public class EnhancedLootTrackerPanel extends PluginPanel {
 
         lootBoxPanel.revalidate();
         lootBoxPanel.repaint();
+    }
+
+    /**
+     * Re-syncs the excluded item/NPC sets cached on the already-built trip objects to match the
+     * current {@code showHidden} state, without recreating any object. Mirrors the exact gating in
+     * {@link #rebuildAfterLoad()}: when showing hidden, the excluded sets are emptied; otherwise
+     * they are set to the plugin's excluded sets. This lets the trip-view toggle rebuild only the
+     * entry rows (via {@link #rebuildTripEntries()}) in place instead of tearing down the panel.
+     */
+    private void applyTripExclusionState() {
+        for (TripPanel tripPanel : tripsMap.values()) {
+            if (showHidden) {
+                tripPanel.setExcludedItems(new HashSet<>());
+                tripPanel.setExcludedNpcs(new HashSet<>());
+            } else {
+                tripPanel.setExcludedItems(parentPlugin.getExcludedItems());
+                tripPanel.setExcludedNpcs(parentPlugin.getExcludedNpcs());
+            }
+        }
+        for (LinkedHashMap<String, LootTrackingPanelBox> lootPanels : tripPanelBoxes.values()) {
+            for (LootTrackingPanelBox panelBox : lootPanels.values()) {
+                panelBox.setExcludedItems(showHidden ? new HashSet<>() : parentPlugin.getExcludedItems());
+            }
+        }
     }
 
     private JPanel buildTrackingModeControls() {
