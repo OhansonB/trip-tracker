@@ -6,6 +6,8 @@ import net.runelite.client.ui.FontManager;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -27,6 +29,13 @@ public class TripComparisonPanel extends JPanel {
     private final JPanel checklistPanel;
     private final Runnable onBackAction;
     private final EnhancedLootTrackerPlugin plugin;
+
+    private JTextField filterField;
+    private String filterText = "";
+    private Timer filterDebounceTimer;
+    // Mirrors the 200ms debounce used by the list/grouped/trip view filters in
+    // EnhancedLootTrackerPanel; declared locally since that constant is private there.
+    private static final int FILTER_DEBOUNCE_MS = 200;
 
     public TripComparisonPanel(List<Trip> allTrips, int preSelectedTripId, Runnable onBackAction, EnhancedLootTrackerPlugin plugin) {
         this.allTrips = allTrips;
@@ -77,7 +86,7 @@ public class TripComparisonPanel extends JPanel {
             for (Trip trip : allTrips) {
                 selectedTripIds.add(trip.getTripId());
             }
-            buildChecklist();
+            rebuildChecklist();
             rebuildTable();
         });
         addKeyboardFocusIndicator(selectAllButton);
@@ -96,7 +105,7 @@ public class TripComparisonPanel extends JPanel {
         deselectAllButton.getAccessibleContext().setAccessibleName("Deselect all trips");
         deselectAllButton.addActionListener(e -> {
             selectedTripIds.clear();
-            buildChecklist();
+            rebuildChecklist();
             rebuildTable();
         });
         addKeyboardFocusIndicator(deselectAllButton);
@@ -104,13 +113,16 @@ public class TripComparisonPanel extends JPanel {
 
         add(checklistHeaderPanel);
 
+        // Filter bar over the checklist (mirrors the list/grouped/trip view filters)
+        add(buildChecklistFilterPanel());
+
         // Trip checkboxes
         checklistPanel = new JPanel();
         checklistPanel.setLayout(new BoxLayout(checklistPanel, BoxLayout.Y_AXIS));
         checklistPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
         checklistPanel.setBorder(new EmptyBorder(0, 7, 10, 7));
         checklistPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        buildChecklist();
+        rebuildChecklist();
         add(checklistPanel);
 
         // Export buttons
@@ -177,9 +189,61 @@ public class TripComparisonPanel extends JPanel {
         rebuildTable();
     }
 
-    private void buildChecklist() {
+    private JPanel buildChecklistFilterPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setBorder(new EmptyBorder(0, 7, 8, 7));
+
+        filterField = new JTextField();
+        filterField.setFont(FontManager.getRunescapeSmallFont());
+        filterField.setToolTipText("Filter by trip name");
+        filterField.putClientProperty("JTextField.placeholderText", "Type to filter...");
+        filterField.getAccessibleContext().setAccessibleName("Filter trips by name");
+        filterField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { onChecklistFilterChanged(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { onChecklistFilterChanged(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { onChecklistFilterChanged(); }
+        });
+
+        JButton clearButton = new JButton("\u2715");
+        clearButton.setFont(FontManager.getRunescapeSmallFont());
+        clearButton.setPreferredSize(new Dimension(20, 20));
+        clearButton.setToolTipText("Clear filter");
+        clearButton.setContentAreaFilled(false);
+        clearButton.setBorderPainted(false);
+        clearButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearButton.addActionListener(e -> filterField.setText(""));
+
+        panel.add(filterField, BorderLayout.CENTER);
+        panel.add(clearButton, BorderLayout.EAST);
+
+        return panel;
+    }
+
+    private void onChecklistFilterChanged() {
+        if (filterDebounceTimer == null) {
+            filterDebounceTimer = new Timer(FILTER_DEBOUNCE_MS, e -> applyChecklistFilter());
+            filterDebounceTimer.setRepeats(false);
+        }
+        filterDebounceTimer.restart();
+    }
+
+    private void applyChecklistFilter() {
+        filterText = filterField.getText().trim().toLowerCase();
+        rebuildChecklist();
+    }
+
+    private void rebuildChecklist() {
         checklistPanel.removeAll();
+        int shown = 0;
         for (Trip trip : allTrips) {
+            if (!filterText.isEmpty() && !trip.getTripName().toLowerCase().contains(filterText)) {
+                continue;
+            }
             JCheckBox checkBox = new JCheckBox(trip.getTripName());
             checkBox.setFont(FontManager.getRunescapeSmallFont());
             checkBox.setForeground(Color.LIGHT_GRAY);
@@ -197,7 +261,20 @@ public class TripComparisonPanel extends JPanel {
             });
             addKeyboardFocusIndicator(checkBox);
             checklistPanel.add(checkBox);
+            shown++;
         }
+
+        if (shown == 0) {
+            JLabel noMatch = new JLabel("No trips match");
+            noMatch.setFont(FontManager.getRunescapeSmallFont());
+            noMatch.setForeground(new Color(0xB0, 0xB0, 0xB0));
+            noMatch.setBorder(new EmptyBorder(10, 7, 10, 7));
+            noMatch.setAlignmentX(Component.LEFT_ALIGNMENT);
+            checklistPanel.add(noMatch);
+        }
+
+        checklistPanel.revalidate();
+        checklistPanel.repaint();
     }
 
     private void rebuildTable() {
