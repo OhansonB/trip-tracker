@@ -230,7 +230,9 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void onConfigChanged(net.runelite.client.events.ConfigChanged event) {
 		if ("triptracker".equals(event.getGroup())) {
 			String key = event.getKey();
-			if ("spriteDisplayMode".equals(key) || "excludedItems".equals(key) || "excludedNpcs".equals(key)) {
+			if ("excludedItems".equals(key) || "excludedNpcs".equals(key)) {
+				SwingUtilities.invokeLater(() -> panel.refreshAfterExclusionChange());
+			} else if ("spriteDisplayMode".equals(key)) {
 				SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 			}
 		}
@@ -1390,8 +1392,8 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void addExcludedItem(String itemName) {
 		String current = config.excludedItems();
 		String updated = appendToCommaSeparated(current, itemName);
+		// Refresh is driven by onConfigChanged on the config write (single refresh, no double rebuild).
 		configManager.setConfiguration("triptracker", "excludedItems", updated);
-		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 	}
 
 	/**
@@ -1401,7 +1403,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 		String current = config.excludedNpcs();
 		String updated = appendToCommaSeparated(current, npcName);
 		configManager.setConfiguration("triptracker", "excludedNpcs", updated);
-		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 	}
 
 	/**
@@ -1424,7 +1425,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void removeExcludedItem(String itemName) {
 		String updated = removeFromCommaSeparated(config.excludedItems(), itemName);
 		configManager.setConfiguration("triptracker", "excludedItems", updated);
-		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 	}
 
 	/**
@@ -1433,7 +1433,6 @@ public class EnhancedLootTrackerPlugin extends Plugin  {
 	public void removeExcludedNpc(String npcName) {
 		String updated = removeFromCommaSeparated(config.excludedNpcs(), npcName);
 		configManager.setConfiguration("triptracker", "excludedNpcs", updated);
-		SwingUtilities.invokeLater(() -> panel.rebuildAfterLoad());
 	}
 
 	private Set<String> parseCommaSeparated(String value) {
