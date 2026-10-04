@@ -153,6 +153,16 @@ Items and NPCs can also be excluded by right-clicking them directly in the panel
 
 ## Release Notes
 
+### v1.2.0
+
+- Improve view-switching performance on large drop histories. Views are now cached and switching between them is instant, instead of rebuilding the panel each time.
+- Cap the list view at the 500 most recent drops to keep it responsive. The full history is retained and still aggregated in the grouped view.
+- Debounce the name filter so fast typing no longer drops keystrokes while the panel updates.
+
+### v1.1.0
+
+- Support item and cash-stack values above the previous integer ceiling, matching a RuneLite change. Very high-value loot is no longer truncated or shown as a negative value.
+
 ### v1.0.1
 
 - Fix a startup/shutdown race where disabling, reloading, or crashing the plugin before its saved data finished loading could overwrite the stored trips and drops with empty data.
